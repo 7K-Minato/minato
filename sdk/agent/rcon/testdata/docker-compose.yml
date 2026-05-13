@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  minecraft:
+    image: itzg/minecraft-server:latest
+    environment:
+      EULA: "TRUE"
+    ports:
+      - "25565:25565"
+      - "25575:25575"
+
+  cs2:
+    image: cm2network/cs2:latest
+    ports:
+      - "27015:27015"
+      - "27020:27020"
+
+  palworld:
+    image: thijsvanloef/palworld-server-docker:latest
+    environment:
+      - "PUID=1000"
+      - "PGID=1000"
+    ports:
+      - "8211:8211"
+      - "25575:25575"

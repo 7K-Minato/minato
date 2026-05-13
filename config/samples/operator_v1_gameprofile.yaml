@@ -1,0 +1,31 @@
+apiVersion: operator.minami.io/v1
+kind: GameProfile
+metadata:
+  labels:
+    app.kubernetes.io/name: minami
+    app.kubernetes.io/managed-by: kustomize
+  name: gameprofile-sample
+spec:
+  displayName: "Minecraft (Sample)"
+  image: "example.com/minami/game:latest"
+  ports:
+    - name: game
+      containerPort: 25565
+      protocol: TCP
+  environment:
+    - key: EULA
+      default: "true"
+      required: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  storage:
+    mountPath: /data
+    sizeDefault: 10Gi
+  agent:
+    image: "example.com/minami/agent-minecraft:latest"
+    version: "0.1.0"

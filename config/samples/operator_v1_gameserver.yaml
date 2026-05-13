@@ -1,0 +1,8 @@
+apiVersion: operator.minami.io/v1
+kind: GameServer
+metadata:
+  name: gameserver-sample
+spec:
+  profile: gameprofile-sample
+  env:
+    EULA: "true"

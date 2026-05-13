@@ -1,0 +1,13 @@
+version: v2
+
+lint:
+  use:
+    - DEFAULT
+
+breaking:
+  use:
+    - FILE
+
+modules:
+  - path: proto
+    name: buf.build/minami/minami
