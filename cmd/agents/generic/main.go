@@ -9,9 +9,9 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	agentv1 "github.com/7k-group/minami/api/agent/v1/minami/agent/v1"
-	"github.com/7k-group/minami/sdk/agent/actions"
-	"github.com/7k-group/minami/sdk/agent/server"
+	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
+	"github.com/7k-group/minato/sdk/agent/actions"
+	"github.com/7k-group/minato/sdk/agent/server"
 )
 
 type genericAgent struct {
@@ -34,8 +34,8 @@ func (n *noopRuntime) Signal(ctx context.Context, target string, signal string) 
 func (n *noopRuntime) Sleep(ctx context.Context, duration time.Duration) error        { return nil }
 
 func main() {
-	configPath := os.Getenv("MINAMI_AGENT_CONFIG_PATH")
-	inline := os.Getenv("MINAMI_AGENT_CONFIG_INLINE")
+	configPath := os.Getenv("minato_AGENT_CONFIG_PATH")
+	inline := os.Getenv("minato_AGENT_CONFIG_INLINE")
 
 	var catalog actions.Catalog
 	var err error
@@ -54,7 +54,7 @@ func main() {
 		catalog = actions.CatalogFromEnv()
 	}
 
-	agent := &genericAgent{name: "minami-generic", version: "0.1.0", catalog: catalog, runtime: &noopRuntime{}}
+	agent := &genericAgent{name: "minato-generic", version: "0.1.0", catalog: catalog, runtime: &noopRuntime{}}
 	_, err = server.Serve(agent, server.Options{})
 	if err != nil {
 		panic(err)

@@ -30,20 +30,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/7k-group/minami/test/utils"
+	"github.com/7k-group/minato/test/utils"
 )
 
 // namespace where the project is deployed in
-const namespace = "minami-system"
+const namespace = "minato-system"
 
 // serviceAccountName created for the project
-const serviceAccountName = "minami-controller-manager"
+const serviceAccountName = "minato-controller-manager"
 
 // metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "minami-controller-manager-metrics-service"
+const metricsServiceName = "minato-controller-manager-metrics-service"
 
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
-const metricsRoleBindingName = "minami-metrics-binding"
+const metricsRoleBindingName = "minato-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
@@ -176,7 +176,7 @@ var _ = Describe("Manager", Ordered, func() {
 		It("should ensure the metrics endpoint is serving metrics", func() {
 			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
 			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
-				"--clusterrole=minami-metrics-reader",
+				"--clusterrole=minato-metrics-reader",
 				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
 			)
 			_, err := utils.Run(cmd)

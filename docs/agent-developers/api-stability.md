@@ -1,12 +1,12 @@
 # Agent API Stability
 
-Minami's agent API is versioned by protobuf package name (e.g., `minami.agent.v1`).
+minato's agent API is versioned by protobuf package name (e.g., `minato.agent.v1`).
 
 ## Versioning policy
 
 - Minor releases add fields/methods in a backward-compatible way.
 - Breaking changes require a new package version (`v2`) and a new SDK module path.
-- Deprecated fields are supported for at least one minor Minami release after announcement.
+- Deprecated fields are supported for at least one minor minato release after announcement.
 
 ## Deprecation timeline
 

@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	agentv1 "github.com/7k-group/minami/api/agent/v1/minami/agent/v1"
+	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
 )
 
 func main() {

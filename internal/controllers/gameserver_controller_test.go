@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	operatorv1 "github.com/7k-group/minami/api/operator/v1"
+	operatorv1 "github.com/7k-group/minato/api/operator/v1"
 )
 
 func TestGameServerReconcilerSmoke(t *testing.T) {

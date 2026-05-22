@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	operatorv1 "github.com/7k-group/minami/api/operator/v1"
+	operatorv1 "github.com/7k-group/minato/api/operator/v1"
 )
 
 func TestBuildGameServerPodSpec(t *testing.T) {
@@ -95,14 +95,14 @@ func TestBuildGameServerPodSpec(t *testing.T) {
 	for _, item := range agent.Env {
 		agentEnv[item.Name] = item.Value
 	}
-	if agentEnv["MINAMI_GAMESERVER_NAME"] != "server-1" {
-		t.Fatalf("expected MINAMI_GAMESERVER_NAME, got %q", agentEnv["MINAMI_GAMESERVER_NAME"])
+	if agentEnv["minato_GAMESERVER_NAME"] != "server-1" {
+		t.Fatalf("expected minato_GAMESERVER_NAME, got %q", agentEnv["minato_GAMESERVER_NAME"])
 	}
-	if agentEnv["MINAMI_GAMESERVER_NAMESPACE"] != "default" {
-		t.Fatalf("expected MINAMI_GAMESERVER_NAMESPACE, got %q", agentEnv["MINAMI_GAMESERVER_NAMESPACE"])
+	if agentEnv["minato_GAMESERVER_NAMESPACE"] != "default" {
+		t.Fatalf("expected minato_GAMESERVER_NAMESPACE, got %q", agentEnv["minato_GAMESERVER_NAMESPACE"])
 	}
-	if agentEnv["MINAMI_GAME_CONTAINER"] != GameContainerName {
-		t.Fatalf("expected MINAMI_GAME_CONTAINER, got %q", agentEnv["MINAMI_GAME_CONTAINER"])
+	if agentEnv["minato_GAME_CONTAINER"] != GameContainerName {
+		t.Fatalf("expected minato_GAME_CONTAINER, got %q", agentEnv["minato_GAME_CONTAINER"])
 	}
 
 	env := map[string]string{}

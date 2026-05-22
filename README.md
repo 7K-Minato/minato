@@ -1,6 +1,6 @@
-# Minami
+# minato
 
-Minami is a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers. This repository contains the operator API types, agent gRPC contract, and bootstrap scaffolding for the control plane and agents.
+minato is a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers. This repository contains the operator API types, agent gRPC contract, and bootstrap scaffolding for the control plane and agents.
 
 ## Quickstart
 ```sh
@@ -37,7 +37,7 @@ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/minami:tag
+make docker-build docker-push IMG=<some-registry>/minato:tag
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
@@ -53,7 +53,7 @@ make install
 **Deploy the Operator to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=<some-registry>/minami:tag
+make deploy IMG=<some-registry>/minato:tag
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
@@ -96,7 +96,7 @@ Following the options to release and provide this solution to the users.
 1. Build the installer for the image built and published in the registry:
 
 ```sh
-make build-installer IMG=<some-registry>/minami:tag
+make build-installer IMG=<some-registry>/minato:tag
 ```
 
 **NOTE:** The makefile target mentioned above generates an 'install.yaml'
@@ -110,7 +110,7 @@ Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
 the project, i.e.:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/minami/<tag or branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/<org>/minato/<tag or branch>/dist/install.yaml
 ```
 
 ### By providing a Helm Chart

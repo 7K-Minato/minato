@@ -28,12 +28,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/7k-group/minami/test/utils"
+	"github.com/7k-group/minato/test/utils"
 )
 
 var (
 	// managerImage is the manager image to be built and loaded for testing.
-	managerImage = "example.com/minami:v0.0.1"
+	managerImage = "example.com/minato:v0.0.1"
 	// shouldCleanupCertManager tracks whether CertManager was installed by this suite.
 	shouldCleanupCertManager = false
 )
@@ -46,7 +46,7 @@ var (
 // To skip CertManager installation, set: CERT_MANAGER_INSTALL_SKIP=true
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting minami e2e test suite\n")
+	_, _ = fmt.Fprintf(GinkgoWriter, "Starting minato e2e test suite\n")
 	RunSpecs(t, "e2e suite")
 }
 

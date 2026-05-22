@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: minami/agent/v1/agent.proto
+// source: minato/agent/v1/agent.proto
 
 package agentv1
 
@@ -19,12 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Agent_Info_FullMethodName            = "/minami.agent.v1.Agent/Info"
-	Agent_HealthCheck_FullMethodName     = "/minami.agent.v1.Agent/HealthCheck"
-	Agent_PrepareShutdown_FullMethodName = "/minami.agent.v1.Agent/PrepareShutdown"
-	Agent_GetPlayers_FullMethodName      = "/minami.agent.v1.Agent/GetPlayers"
-	Agent_ExecuteAction_FullMethodName   = "/minami.agent.v1.Agent/ExecuteAction"
-	Agent_Console_FullMethodName         = "/minami.agent.v1.Agent/Console"
+	Agent_Info_FullMethodName            = "/minato.agent.v1.Agent/Info"
+	Agent_HealthCheck_FullMethodName     = "/minato.agent.v1.Agent/HealthCheck"
+	Agent_PrepareShutdown_FullMethodName = "/minato.agent.v1.Agent/PrepareShutdown"
+	Agent_GetPlayers_FullMethodName      = "/minato.agent.v1.Agent/GetPlayers"
+	Agent_ExecuteAction_FullMethodName   = "/minato.agent.v1.Agent/ExecuteAction"
+	Agent_Console_FullMethodName         = "/minato.agent.v1.Agent/Console"
 )
 
 // AgentClient is the client API for Agent service.
@@ -270,7 +270,7 @@ type Agent_ConsoleServer = grpc.BidiStreamingServer[ConsoleClientMessage, Consol
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Agent_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "minami.agent.v1.Agent",
+	ServiceName: "minato.agent.v1.Agent",
 	HandlerType: (*AgentServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -302,5 +302,5 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "minami/agent/v1/agent.proto",
+	Metadata: "minato/agent/v1/agent.proto",
 }

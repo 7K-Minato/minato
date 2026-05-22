@@ -18,12 +18,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	operatorv1 "github.com/7k-group/minami/api/operator/v1"
-	"github.com/7k-group/minami/internal/controllers/builder"
+	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	"github.com/7k-group/minato/internal/controllers/builder"
 )
 
 const (
-	gameServerFinalizer = "minami.io/gameserver-finalizer"
+	gameServerFinalizer = "minato.io/gameserver-finalizer"
 )
 
 type GameServerReconciler struct {
@@ -31,10 +31,10 @@ type GameServerReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=operator.minami.io,resources=gameservers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=operator.minami.io,resources=gameservers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=operator.minami.io,resources=gameservers/finalizers,verbs=update
-// +kubebuilder:rbac:groups=operator.minami.io,resources=gameprofiles,verbs=get;list;watch
+// +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=operator.minato.io,resources=gameprofiles,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
@@ -91,7 +91,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := controllerutil.SetControllerReference(server, sts, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.Patch(ctx, sts, client.Apply, client.ForceOwnership, client.FieldOwner("minami-operator")); err != nil {
+	if err := r.Patch(ctx, sts, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -99,7 +99,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := controllerutil.SetControllerReference(server, svc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.Patch(ctx, svc, client.Apply, client.ForceOwnership, client.FieldOwner("minami-operator")); err != nil {
+	if err := r.Patch(ctx, svc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -107,7 +107,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := controllerutil.SetControllerReference(server, pvc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.Patch(ctx, pvc, client.Apply, client.ForceOwnership, client.FieldOwner("minami-operator")); err != nil {
+	if err := r.Patch(ctx, pvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -282,9 +282,9 @@ func buildPVC(server *operatorv1.GameServer, profile *operatorv1.GameProfile) *c
 
 func buildGameServerLabels(server *operatorv1.GameServer, profile *operatorv1.GameProfile) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name": "minami",
-		"minami.io/gameserver":   server.Name,
-		"minami.io/profile":      profile.Name,
+		"app.kubernetes.io/name": "minato",
+		"minato.io/gameserver":   server.Name,
+		"minato.io/profile":      profile.Name,
 	}
 }
 

@@ -1,13 +1,13 @@
-# Minami Architecture Overview
+# minato Architecture Overview
 
-Minami is a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers. It is designed for hosting providers running many games for many tenants, and operators running large fleets of persistent worlds for a single game.
+minato is a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers. It is designed for hosting providers running many games for many tenants, and operators running large fleets of persistent worlds for a single game.
 
 ## Core components
 
-1. **Minami Operator**: owns CRDs and reconciles them into Kubernetes resources. Game-agnostic by design.
-2. **Minami Agent SDK**: the public Go module for building per-game agents and implementing the gRPC contract.
+1. **minato Operator**: owns CRDs and reconciles them into Kubernetes resources. Game-agnostic by design.
+2. **minato Agent SDK**: the public Go module for building per-game agents and implementing the gRPC contract.
 3. **Per-game Agents**: sidecars injected into every game server pod, encapsulating game-specific knowledge.
-4. **Minami Control Plane**: user-facing API that validates requests, enforces auth/RBAC, audits actions, and dispatches to agents.
+4. **minato Control Plane**: user-facing API that validates requests, enforces auth/RBAC, audits actions, and dispatches to agents.
 
 ## Design principles
 
@@ -21,7 +21,7 @@ Minami is a Kubernetes-native platform for hosting persistent, multi-game dedica
 
 ```text
                 +------------------------+
-                |   Minami Control Plane |
+                |   minato Control Plane |
                 |  (HTTP/gRPC, RBAC,     |
                 |   audit, dispatch)     |
                 +-----------+------------+
@@ -32,7 +32,7 @@ Minami is a Kubernetes-native platform for hosting persistent, multi-game dedica
   |                   Kubernetes Cluster              |
   |                                                   |
   |  +-------------------+    +-------------------+   |
-  |  | Minami Operator   |    | GameServer Pod    |   |
+  |  | minato Operator   |    | GameServer Pod    |   |
   |  | (CRD reconciler)  |    | +---------------+ |   |
   |  |                   |    | | Game Server   | |   |
   |  +---------+---------+    | +---------------+ |   |

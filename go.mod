@@ -1,4 +1,4 @@
-module github.com/7k-group/minami
+module github.com/7k-group/minato
 
 go 1.25.7
 

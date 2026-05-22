@@ -3,26 +3,26 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.14.0
-domain: minami.io
+domain: minato.io
 layout:
 - go.kubebuilder.io/v4
-projectName: minami
-repo: github.com/7k-group/minami
+projectName: minato
+repo: github.com/7k-group/minato
 resources:
 - api:
     crdVersion: v1
     namespaced: false
-  domain: minami.io
+  domain: minato.io
   group: operator
   kind: GameProfile
-  path: github.com/7k-group/minami/api/operator/v1
+  path: github.com/7k-group/minato/api/operator/v1
   version: v1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: minami.io
+  domain: minato.io
   group: operator
   kind: GameServer
-  path: github.com/7k-group/minami/api/operator/v1
+  path: github.com/7k-group/minato/api/operator/v1
   version: v1
 version: "3"

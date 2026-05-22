@@ -3,5 +3,5 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("minami control plane placeholder")
+	fmt.Println("minato control plane placeholder")
 }

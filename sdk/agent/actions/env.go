@@ -7,8 +7,8 @@ import (
 
 // CatalogFromEnv builds a catalog from environment variables.
 // Format:
-// MINAMI_ACTION_<ACTION>_STEP_<STEP>=<type>
-// MINAMI_ACTION_<ACTION>_INPUT_<STEP>_<INPUT>=<value>
+// minato_ACTION_<ACTION>_STEP_<STEP>=<type>
+// minato_ACTION_<ACTION>_INPUT_<STEP>_<INPUT>=<value>
 func CatalogFromEnv() Catalog {
 	actionsMap := map[string]*ActionDefinition{}
 	for _, entry := range os.Environ() {
@@ -18,10 +18,10 @@ func CatalogFromEnv() Catalog {
 		}
 		key := parts[0]
 		value := parts[1]
-		if !strings.HasPrefix(key, "MINAMI_ACTION_") || strings.Contains(key, "_INPUT_") {
+		if !strings.HasPrefix(key, "minato_ACTION_") || strings.Contains(key, "_INPUT_") {
 			continue
 		}
-		remainder := strings.TrimPrefix(key, "MINAMI_ACTION_")
+		remainder := strings.TrimPrefix(key, "minato_ACTION_")
 		segments := strings.SplitN(remainder, "_STEP_", 2)
 		if len(segments) != 2 {
 			continue
@@ -38,7 +38,7 @@ func CatalogFromEnv() Catalog {
 		}
 		stepType := value
 		inputs := map[string]string{}
-		inputKeyPrefix := "MINAMI_ACTION_" + strings.ToUpper(actionName) + "_INPUT_" + strings.ToUpper(stepName) + "_"
+		inputKeyPrefix := "minato_ACTION_" + strings.ToUpper(actionName) + "_INPUT_" + strings.ToUpper(stepName) + "_"
 		for _, env := range os.Environ() {
 			parts := strings.SplitN(env, "=", 2)
 			if len(parts) != 2 {

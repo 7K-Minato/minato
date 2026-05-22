@@ -19,8 +19,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	operatorv1 "github.com/7k-group/minami/api/operator/v1"
-	"github.com/7k-group/minami/internal/controllers"
+	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	"github.com/7k-group/minato/internal/controllers"
 )
 
 var (
@@ -141,7 +141,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "c0f56da2.minami.io",
+		LeaderElectionID:       "c0f56da2.minato.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: gameprofiles.operator.minami.io
+  name: gameprofiles.operator.minato.io
 spec:
-  group: operator.minami.io
+  group: operator.minato.io
   names:
     kind: GameProfile
     listKind: GameProfileList

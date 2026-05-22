@@ -10,4 +10,4 @@ breaking:
 
 modules:
   - path: proto
-    name: buf.build/minami/minami
+    name: buf.build/minato/minato

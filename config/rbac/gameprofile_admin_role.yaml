@@ -1,7 +1,7 @@
-# This rule is not used by the project minami itself.
+# This rule is not used by the project minato itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
-# Grants full permissions ('*') over operator.minami.io.
+# Grants full permissions ('*') over operator.minato.io.
 # This role is intended for users authorized to modify roles and bindings within the cluster,
 # enabling them to delegate specific permissions to other users or groups as needed.
 
@@ -9,18 +9,18 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app.kubernetes.io/name: minami
+    app.kubernetes.io/name: minato
     app.kubernetes.io/managed-by: kustomize
   name: gameprofile-admin-role
 rules:
 - apiGroups:
-  - operator.minami.io
+  - operator.minato.io
   resources:
   - gameprofiles
   verbs:
   - '*'
 - apiGroups:
-  - operator.minami.io
+  - operator.minato.io
   resources:
   - gameprofiles/status
   verbs:

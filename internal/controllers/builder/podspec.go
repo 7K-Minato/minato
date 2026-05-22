@@ -6,12 +6,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	operatorv1 "github.com/7k-group/minami/api/operator/v1"
+	operatorv1 "github.com/7k-group/minato/api/operator/v1"
 )
 
 const (
-	GameContainerName  = "minami-game"
-	AgentContainerName = "minami-agent"
+	GameContainerName  = "minato-game"
+	AgentContainerName = "minato-agent"
 	DataVolumeName     = "data"
 	AgentGRPCPort      = 9876
 	AgentPortName      = "agent"
@@ -50,9 +50,9 @@ func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.
 			},
 		},
 		Env: []corev1.EnvVar{
-			{Name: "MINAMI_GAMESERVER_NAME", Value: server.Name},
-			{Name: "MINAMI_GAMESERVER_NAMESPACE", Value: server.Namespace},
-			{Name: "MINAMI_GAME_CONTAINER", Value: GameContainerName},
+			{Name: "minato_GAMESERVER_NAME", Value: server.Name},
+			{Name: "minato_GAMESERVER_NAMESPACE", Value: server.Namespace},
+			{Name: "minato_GAME_CONTAINER", Value: GameContainerName},
 		},
 		VolumeMounts: buildDataVolumeMounts(profile),
 	}

@@ -1,4 +1,4 @@
-apiVersion: operator.minami.io/v1
+apiVersion: operator.minato.io/v1
 kind: GameServer
 metadata:
   name: gameserver-sample

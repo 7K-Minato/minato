@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Minami needs a stable, public agent RPC contract that is used by the control plane to dispatch actions and by per-game agents to implement game-specific behavior. This contract is defined in protobuf and must be supported by the Go SDK and production-grade runtime.
+minato needs a stable, public agent RPC contract that is used by the control plane to dispatch actions and by per-game agents to implement game-specific behavior. This contract is defined in protobuf and must be supported by the Go SDK and production-grade runtime.
 
 ## Decision
 Use grpc-go (google.golang.org/grpc) for the agent RPC framework.

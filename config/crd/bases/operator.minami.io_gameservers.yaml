@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: gameservers.operator.minami.io
+  name: gameservers.operator.minato.io
 spec:
-  group: operator.minami.io
+  group: operator.minato.io
   names:
     kind: GameServer
     listKind: GameServerList

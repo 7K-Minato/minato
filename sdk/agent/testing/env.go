@@ -1,6 +1,6 @@
 package testing
 
-import "github.com/7k-group/minami/sdk/agent/rcon"
+import "github.com/7k-group/minato/sdk/agent/rcon"
 
 type FakeAgentEnv struct {
 	RCON *rcon.MockClient

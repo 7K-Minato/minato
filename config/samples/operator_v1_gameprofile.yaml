@@ -1,13 +1,13 @@
-apiVersion: operator.minami.io/v1
+apiVersion: operator.minato.io/v1
 kind: GameProfile
 metadata:
   labels:
-    app.kubernetes.io/name: minami
+    app.kubernetes.io/name: minato
     app.kubernetes.io/managed-by: kustomize
   name: gameprofile-sample
 spec:
   displayName: "Minecraft (Sample)"
-  image: "example.com/minami/game:latest"
+  image: "example.com/minato/game:latest"
   ports:
     - name: game
       containerPort: 25565
@@ -27,5 +27,5 @@ spec:
     mountPath: /data
     sizeDefault: 10Gi
   agent:
-    image: "example.com/minami/agent-minecraft:latest"
+    image: "example.com/minato/agent-minecraft:latest"
     version: "0.1.0"

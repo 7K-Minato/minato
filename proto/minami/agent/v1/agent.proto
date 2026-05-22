@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package minami.agent.v1;
+package minato.agent.v1;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/7k-group/minami/api/agent/v1/minami/agent/v1;agentv1";
+option go_package = "github.com/7k-group/minato/api/agent/v1/minato/agent/v1;agentv1";
 
 service Agent {
   rpc Info(InfoRequest) returns (InfoResponse);

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.8
 // 	protoc        (unknown)
-// source: minami/agent/v1/agent.proto
+// source: minato/agent/v1/agent.proto
 
 package agentv1
 
@@ -68,11 +68,11 @@ func (x ActionState) String() string {
 }
 
 func (ActionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_minami_agent_v1_agent_proto_enumTypes[0].Descriptor()
+	return file_minato_agent_v1_agent_proto_enumTypes[0].Descriptor()
 }
 
 func (ActionState) Type() protoreflect.EnumType {
-	return &file_minami_agent_v1_agent_proto_enumTypes[0]
+	return &file_minato_agent_v1_agent_proto_enumTypes[0]
 }
 
 func (x ActionState) Number() protoreflect.EnumNumber {
@@ -81,7 +81,7 @@ func (x ActionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ActionState.Descriptor instead.
 func (ActionState) EnumDescriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{0}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{0}
 }
 
 type InfoRequest struct {
@@ -92,7 +92,7 @@ type InfoRequest struct {
 
 func (x *InfoRequest) Reset() {
 	*x = InfoRequest{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[0]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -104,7 +104,7 @@ func (x *InfoRequest) String() string {
 func (*InfoRequest) ProtoMessage() {}
 
 func (x *InfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[0]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -117,7 +117,7 @@ func (x *InfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InfoRequest.ProtoReflect.Descriptor instead.
 func (*InfoRequest) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{0}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{0}
 }
 
 type InfoResponse struct {
@@ -132,7 +132,7 @@ type InfoResponse struct {
 
 func (x *InfoResponse) Reset() {
 	*x = InfoResponse{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[1]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -144,7 +144,7 @@ func (x *InfoResponse) String() string {
 func (*InfoResponse) ProtoMessage() {}
 
 func (x *InfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[1]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -157,7 +157,7 @@ func (x *InfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InfoResponse.ProtoReflect.Descriptor instead.
 func (*InfoResponse) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{1}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *InfoResponse) GetName() string {
@@ -196,7 +196,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[2]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -208,7 +208,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[2]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -221,7 +221,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{2}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{2}
 }
 
 type HealthResponse struct {
@@ -235,7 +235,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[3]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -247,7 +247,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[3]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -260,7 +260,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{3}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HealthResponse) GetReady() bool {
@@ -294,7 +294,7 @@ type ShutdownRequest struct {
 
 func (x *ShutdownRequest) Reset() {
 	*x = ShutdownRequest{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[4]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -306,7 +306,7 @@ func (x *ShutdownRequest) String() string {
 func (*ShutdownRequest) ProtoMessage() {}
 
 func (x *ShutdownRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[4]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -319,7 +319,7 @@ func (x *ShutdownRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShutdownRequest.ProtoReflect.Descriptor instead.
 func (*ShutdownRequest) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{4}
+	return file__agent_v1_agent_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ShutdownRequest) GetTimeoutSeconds() int32 {
@@ -346,7 +346,7 @@ type ShutdownResponse struct {
 
 func (x *ShutdownResponse) Reset() {
 	*x = ShutdownResponse{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[5]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +358,7 @@ func (x *ShutdownResponse) String() string {
 func (*ShutdownResponse) ProtoMessage() {}
 
 func (x *ShutdownResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[5]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +371,7 @@ func (x *ShutdownResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShutdownResponse.ProtoReflect.Descriptor instead.
 func (*ShutdownResponse) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{5}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ShutdownResponse) GetSuccess() bool {
@@ -396,7 +396,7 @@ type PlayersRequest struct {
 
 func (x *PlayersRequest) Reset() {
 	*x = PlayersRequest{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[6]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +408,7 @@ func (x *PlayersRequest) String() string {
 func (*PlayersRequest) ProtoMessage() {}
 
 func (x *PlayersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[6]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +421,7 @@ func (x *PlayersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayersRequest.ProtoReflect.Descriptor instead.
 func (*PlayersRequest) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{6}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{6}
 }
 
 type PlayersResponse struct {
@@ -435,7 +435,7 @@ type PlayersResponse struct {
 
 func (x *PlayersResponse) Reset() {
 	*x = PlayersResponse{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[7]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -447,7 +447,7 @@ func (x *PlayersResponse) String() string {
 func (*PlayersResponse) ProtoMessage() {}
 
 func (x *PlayersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[7]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -460,7 +460,7 @@ func (x *PlayersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayersResponse.ProtoReflect.Descriptor instead.
 func (*PlayersResponse) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{7}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PlayersResponse) GetOnline() int32 {
@@ -495,7 +495,7 @@ type Player struct {
 
 func (x *Player) Reset() {
 	*x = Player{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[8]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -507,7 +507,7 @@ func (x *Player) String() string {
 func (*Player) ProtoMessage() {}
 
 func (x *Player) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[8]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -520,7 +520,7 @@ func (x *Player) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Player.ProtoReflect.Descriptor instead.
 func (*Player) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{8}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Player) GetName() string {
@@ -555,7 +555,7 @@ type ExecuteActionRequest struct {
 
 func (x *ExecuteActionRequest) Reset() {
 	*x = ExecuteActionRequest{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[9]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -567,7 +567,7 @@ func (x *ExecuteActionRequest) String() string {
 func (*ExecuteActionRequest) ProtoMessage() {}
 
 func (x *ExecuteActionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[9]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -580,7 +580,7 @@ func (x *ExecuteActionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteActionRequest.ProtoReflect.Descriptor instead.
 func (*ExecuteActionRequest) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{9}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ExecuteActionRequest) GetActionName() string {
@@ -606,7 +606,7 @@ func (x *ExecuteActionRequest) GetExecutionId() string {
 
 type ExecuteActionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         ActionState            `protobuf:"varint,1,opt,name=state,proto3,enum=minami.agent.v1.ActionState" json:"state,omitempty"`
+	State         ActionState            `protobuf:"varint,1,opt,name=state,proto3,enum=minato.agent.v1.ActionState" json:"state,omitempty"`
 	Result        *anypb.Any             `protobuf:"bytes,2,opt,name=result,proto3" json:"result,omitempty"`
 	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -615,7 +615,7 @@ type ExecuteActionResponse struct {
 
 func (x *ExecuteActionResponse) Reset() {
 	*x = ExecuteActionResponse{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[10]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +627,7 @@ func (x *ExecuteActionResponse) String() string {
 func (*ExecuteActionResponse) ProtoMessage() {}
 
 func (x *ExecuteActionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[10]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +640,7 @@ func (x *ExecuteActionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteActionResponse.ProtoReflect.Descriptor instead.
 func (*ExecuteActionResponse) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{10}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ExecuteActionResponse) GetState() ActionState {
@@ -677,7 +677,7 @@ type ConsoleClientMessage struct {
 
 func (x *ConsoleClientMessage) Reset() {
 	*x = ConsoleClientMessage{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -689,7 +689,7 @@ func (x *ConsoleClientMessage) String() string {
 func (*ConsoleClientMessage) ProtoMessage() {}
 
 func (x *ConsoleClientMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[11]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -702,7 +702,7 @@ func (x *ConsoleClientMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsoleClientMessage.ProtoReflect.Descriptor instead.
 func (*ConsoleClientMessage) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{11}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ConsoleClientMessage) GetPayload() isConsoleClientMessage_Payload {
@@ -761,7 +761,7 @@ type ConsoleServerMessage struct {
 
 func (x *ConsoleServerMessage) Reset() {
 	*x = ConsoleServerMessage{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -773,7 +773,7 @@ func (x *ConsoleServerMessage) String() string {
 func (*ConsoleServerMessage) ProtoMessage() {}
 
 func (x *ConsoleServerMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -786,7 +786,7 @@ func (x *ConsoleServerMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsoleServerMessage.ProtoReflect.Descriptor instead.
 func (*ConsoleServerMessage) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{12}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ConsoleServerMessage) GetPayload() isConsoleServerMessage_Payload {
@@ -871,7 +871,7 @@ type ActionSchema struct {
 
 func (x *ActionSchema) Reset() {
 	*x = ActionSchema{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -883,7 +883,7 @@ func (x *ActionSchema) String() string {
 func (*ActionSchema) ProtoMessage() {}
 
 func (x *ActionSchema) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -896,7 +896,7 @@ func (x *ActionSchema) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionSchema.ProtoReflect.Descriptor instead.
 func (*ActionSchema) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{13}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ActionSchema) GetName() string {
@@ -932,7 +932,7 @@ type ParamSchema struct {
 
 func (x *ParamSchema) Reset() {
 	*x = ParamSchema{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[14]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -944,7 +944,7 @@ func (x *ParamSchema) String() string {
 func (*ParamSchema) ProtoMessage() {}
 
 func (x *ParamSchema) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[14]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -957,7 +957,7 @@ func (x *ParamSchema) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParamSchema.ProtoReflect.Descriptor instead.
 func (*ParamSchema) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{14}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ParamSchema) GetType() string {
@@ -999,7 +999,7 @@ type MetricDescriptor struct {
 
 func (x *MetricDescriptor) Reset() {
 	*x = MetricDescriptor{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[15]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1011,7 +1011,7 @@ func (x *MetricDescriptor) String() string {
 func (*MetricDescriptor) ProtoMessage() {}
 
 func (x *MetricDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[15]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1024,7 +1024,7 @@ func (x *MetricDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricDescriptor.ProtoReflect.Descriptor instead.
 func (*MetricDescriptor) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{15}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *MetricDescriptor) GetName() string {
@@ -1057,7 +1057,7 @@ type ConsoleCommand struct {
 
 func (x *ConsoleCommand) Reset() {
 	*x = ConsoleCommand{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[16]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1069,7 @@ func (x *ConsoleCommand) String() string {
 func (*ConsoleCommand) ProtoMessage() {}
 
 func (x *ConsoleCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[16]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1082,7 @@ func (x *ConsoleCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsoleCommand.ProtoReflect.Descriptor instead.
 func (*ConsoleCommand) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{16}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ConsoleCommand) GetRconCommand() string {
@@ -1101,7 +1101,7 @@ type ConsolePing struct {
 
 func (x *ConsolePing) Reset() {
 	*x = ConsolePing{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[17]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1113,7 +1113,7 @@ func (x *ConsolePing) String() string {
 func (*ConsolePing) ProtoMessage() {}
 
 func (x *ConsolePing) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[17]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1126,7 +1126,7 @@ func (x *ConsolePing) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsolePing.ProtoReflect.Descriptor instead.
 func (*ConsolePing) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{17}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ConsolePing) GetMessage() string {
@@ -1145,7 +1145,7 @@ type ConsoleLog struct {
 
 func (x *ConsoleLog) Reset() {
 	*x = ConsoleLog{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[18]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1157,7 +1157,7 @@ func (x *ConsoleLog) String() string {
 func (*ConsoleLog) ProtoMessage() {}
 
 func (x *ConsoleLog) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[18]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1170,7 +1170,7 @@ func (x *ConsoleLog) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsoleLog.ProtoReflect.Descriptor instead.
 func (*ConsoleLog) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{18}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ConsoleLog) GetLine() string {
@@ -1189,7 +1189,7 @@ type ConsoleResponse struct {
 
 func (x *ConsoleResponse) Reset() {
 	*x = ConsoleResponse{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[19]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1201,7 +1201,7 @@ func (x *ConsoleResponse) String() string {
 func (*ConsoleResponse) ProtoMessage() {}
 
 func (x *ConsoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[19]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1214,7 +1214,7 @@ func (x *ConsoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsoleResponse.ProtoReflect.Descriptor instead.
 func (*ConsoleResponse) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{19}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ConsoleResponse) GetResponse() string {
@@ -1233,7 +1233,7 @@ type ConsoleStatus struct {
 
 func (x *ConsoleStatus) Reset() {
 	*x = ConsoleStatus{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[20]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1245,7 +1245,7 @@ func (x *ConsoleStatus) String() string {
 func (*ConsoleStatus) ProtoMessage() {}
 
 func (x *ConsoleStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[20]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1258,7 +1258,7 @@ func (x *ConsoleStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsoleStatus.ProtoReflect.Descriptor instead.
 func (*ConsoleStatus) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{20}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ConsoleStatus) GetState() string {
@@ -1277,7 +1277,7 @@ type ConsoleError struct {
 
 func (x *ConsoleError) Reset() {
 	*x = ConsoleError{}
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[21]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1289,7 +1289,7 @@ func (x *ConsoleError) String() string {
 func (*ConsoleError) ProtoMessage() {}
 
 func (x *ConsoleError) ProtoReflect() protoreflect.Message {
-	mi := &file_minami_agent_v1_agent_proto_msgTypes[21]
+	mi := &file_minato_agent_v1_agent_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1302,7 +1302,7 @@ func (x *ConsoleError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsoleError.ProtoReflect.Descriptor instead.
 func (*ConsoleError) Descriptor() ([]byte, []int) {
-	return file_minami_agent_v1_agent_proto_rawDescGZIP(), []int{21}
+	return file_minato_agent_v1_agent_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ConsoleError) GetMessage() string {
@@ -1312,22 +1312,22 @@ func (x *ConsoleError) GetMessage() string {
 	return ""
 }
 
-var File_minami_agent_v1_agent_proto protoreflect.FileDescriptor
+var File_minato_agent_v1_agent_proto protoreflect.FileDescriptor
 
-const file_minami_agent_v1_agent_proto_rawDesc = "" +
+const file_minato_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1bminami/agent/v1/agent.proto\x12\x0fminami.agent.v1\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\r\n" +
+	"\x1bminato/agent/v1/agent.proto\x12\x0fminato.agent.v1\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\r\n" +
 	"\vInfoRequest\"\xb2\x01\n" +
 	"\fInfoResponse\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x127\n" +
-	"\aactions\x18\x03 \x03(\v2\x1d.minami.agent.v1.ActionSchemaR\aactions\x12;\n" +
-	"\ametrics\x18\x04 \x03(\v2!.minami.agent.v1.MetricDescriptorR\ametrics\"\x0f\n" +
+	"\aactions\x18\x03 \x03(\v2\x1d.minato.agent.v1.ActionSchemaR\aactions\x12;\n" +
+	"\ametrics\x18\x04 \x03(\v2!.minato.agent.v1.MetricDescriptorR\ametrics\"\x0f\n" +
 	"\rHealthRequest\"\xc4\x01\n" +
 	"\x0eHealthResponse\x12\x14\n" +
 	"\x05ready\x18\x01 \x01(\bR\x05ready\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12F\n" +
-	"\adetails\x18\x03 \x03(\v2,.minami.agent.v1.HealthResponse.DetailsEntryR\adetails\x1a:\n" +
+	"\adetails\x18\x03 \x03(\v2,.minato.agent.v1.HealthResponse.DetailsEntryR\adetails\x1a:\n" +
 	"\fDetailsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"]\n" +
@@ -1341,7 +1341,7 @@ const file_minami_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fPlayersResponse\x12\x16\n" +
 	"\x06online\x18\x01 \x01(\x05R\x06online\x12\x1a\n" +
 	"\bcapacity\x18\x02 \x01(\x05R\bcapacity\x121\n" +
-	"\aplayers\x18\x03 \x03(\v2\x17.minami.agent.v1.PlayerR\aplayers\"e\n" +
+	"\aplayers\x18\x03 \x03(\v2\x17.minato.agent.v1.PlayerR\aplayers\"e\n" +
 	"\x06Player\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x127\n" +
@@ -1349,32 +1349,32 @@ const file_minami_agent_v1_agent_proto_rawDesc = "" +
 	"\x14ExecuteActionRequest\x12\x1f\n" +
 	"\vaction_name\x18\x01 \x01(\tR\n" +
 	"actionName\x12I\n" +
-	"\x06params\x18\x02 \x03(\v21.minami.agent.v1.ExecuteActionRequest.ParamsEntryR\x06params\x12!\n" +
+	"\x06params\x18\x02 \x03(\v21.minato.agent.v1.ExecuteActionRequest.ParamsEntryR\x06params\x12!\n" +
 	"\fexecution_id\x18\x03 \x01(\tR\vexecutionId\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8f\x01\n" +
 	"\x15ExecuteActionResponse\x122\n" +
-	"\x05state\x18\x01 \x01(\x0e2\x1c.minami.agent.v1.ActionStateR\x05state\x12,\n" +
+	"\x05state\x18\x01 \x01(\x0e2\x1c.minato.agent.v1.ActionStateR\x05state\x12,\n" +
 	"\x06result\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\x06result\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\"\x92\x01\n" +
 	"\x14ConsoleClientMessage\x12;\n" +
-	"\acommand\x18\x01 \x01(\v2\x1f.minami.agent.v1.ConsoleCommandH\x00R\acommand\x122\n" +
-	"\x04ping\x18\x02 \x01(\v2\x1c.minami.agent.v1.ConsolePingH\x00R\x04pingB\t\n" +
+	"\acommand\x18\x01 \x01(\v2\x1f.minato.agent.v1.ConsoleCommandH\x00R\acommand\x122\n" +
+	"\x04ping\x18\x02 \x01(\v2\x1c.minato.agent.v1.ConsolePingH\x00R\x04pingB\t\n" +
 	"\apayload\"\x83\x02\n" +
 	"\x14ConsoleServerMessage\x12/\n" +
-	"\x03log\x18\x01 \x01(\v2\x1b.minami.agent.v1.ConsoleLogH\x00R\x03log\x12>\n" +
-	"\bresponse\x18\x02 \x01(\v2 .minami.agent.v1.ConsoleResponseH\x00R\bresponse\x128\n" +
-	"\x06status\x18\x03 \x01(\v2\x1e.minami.agent.v1.ConsoleStatusH\x00R\x06status\x125\n" +
-	"\x05error\x18\x04 \x01(\v2\x1d.minami.agent.v1.ConsoleErrorH\x00R\x05errorB\t\n" +
+	"\x03log\x18\x01 \x01(\v2\x1b.minato.agent.v1.ConsoleLogH\x00R\x03log\x12>\n" +
+	"\bresponse\x18\x02 \x01(\v2 .minato.agent.v1.ConsoleResponseH\x00R\bresponse\x128\n" +
+	"\x06status\x18\x03 \x01(\v2\x1e.minato.agent.v1.ConsoleStatusH\x00R\x06status\x125\n" +
+	"\x05error\x18\x04 \x01(\v2\x1d.minato.agent.v1.ConsoleErrorH\x00R\x05errorB\t\n" +
 	"\apayload\"\xe0\x01\n" +
 	"\fActionSchema\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12A\n" +
-	"\x06params\x18\x03 \x03(\v2).minami.agent.v1.ActionSchema.ParamsEntryR\x06params\x1aW\n" +
+	"\x06params\x18\x03 \x03(\v2).minato.agent.v1.ActionSchema.ParamsEntryR\x06params\x1aW\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x122\n" +
-	"\x05value\x18\x02 \x01(\v2\x1c.minami.agent.v1.ParamSchemaR\x05value:\x028\x01\"y\n" +
+	"\x05value\x18\x02 \x01(\v2\x1c.minato.agent.v1.ParamSchemaR\x05value:\x028\x01\"y\n" +
 	"\vParamSchema\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1a\n" +
 	"\brequired\x18\x02 \x01(\bR\brequired\x12 \n" +
@@ -1406,87 +1406,87 @@ const file_minami_agent_v1_agent_proto_rawDesc = "" +
 	"\x16ACTION_STATE_TIMED_OUT\x10\x05\x12\x19\n" +
 	"\x15ACTION_STATE_REJECTED\x10\x062\x82\x04\n" +
 	"\x05Agent\x12C\n" +
-	"\x04Info\x12\x1c.minami.agent.v1.InfoRequest\x1a\x1d.minami.agent.v1.InfoResponse\x12N\n" +
-	"\vHealthCheck\x12\x1e.minami.agent.v1.HealthRequest\x1a\x1f.minami.agent.v1.HealthResponse\x12V\n" +
-	"\x0fPrepareShutdown\x12 .minami.agent.v1.ShutdownRequest\x1a!.minami.agent.v1.ShutdownResponse\x12O\n" +
+	"\x04Info\x12\x1c.minato.agent.v1.InfoRequest\x1a\x1d.minato.agent.v1.InfoResponse\x12N\n" +
+	"\vHealthCheck\x12\x1e.minato.agent.v1.HealthRequest\x1a\x1f.minato.agent.v1.HealthResponse\x12V\n" +
+	"\x0fPrepareShutdown\x12 .minato.agent.v1.ShutdownRequest\x1a!.minato.agent.v1.ShutdownResponse\x12O\n" +
 	"\n" +
-	"GetPlayers\x12\x1f.minami.agent.v1.PlayersRequest\x1a .minami.agent.v1.PlayersResponse\x12^\n" +
-	"\rExecuteAction\x12%.minami.agent.v1.ExecuteActionRequest\x1a&.minami.agent.v1.ExecuteActionResponse\x12[\n" +
-	"\aConsole\x12%.minami.agent.v1.ConsoleClientMessage\x1a%.minami.agent.v1.ConsoleServerMessage(\x010\x01BAZ?github.com/7k-group/minami/api/agent/v1/minami/agent/v1;agentv1b\x06proto3"
+	"GetPlayers\x12\x1f.minato.agent.v1.PlayersRequest\x1a .minato.agent.v1.PlayersResponse\x12^\n" +
+	"\rExecuteAction\x12%.minato.agent.v1.ExecuteActionRequest\x1a&.minato.agent.v1.ExecuteActionResponse\x12[\n" +
+	"\aConsole\x12%.minato.agent.v1.ConsoleClientMessage\x1a%.minato.agent.v1.ConsoleServerMessage(\x010\x01BAZ?github.com/7k-group/minato/api/agent/v1/minato/agent/v1;agentv1b\x06proto3"
 
 var (
-	file_minami_agent_v1_agent_proto_rawDescOnce sync.Once
-	file_minami_agent_v1_agent_proto_rawDescData []byte
+	file_minato_agent_v1_agent_proto_rawDescOnce sync.Once
+	file_minato_agent_v1_agent_proto_rawDescData []byte
 )
 
-func file_minami_agent_v1_agent_proto_rawDescGZIP() []byte {
-	file_minami_agent_v1_agent_proto_rawDescOnce.Do(func() {
-		file_minami_agent_v1_agent_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_minami_agent_v1_agent_proto_rawDesc), len(file_minami_agent_v1_agent_proto_rawDesc)))
+func file_minato_agent_v1_agent_proto_rawDescGZIP() []byte {
+	file_minato_agent_v1_agent_proto_rawDescOnce.Do(func() {
+		file_minato_agent_v1_agent_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_minato_agent_v1_agent_proto_rawDesc), len(file_minato_agent_v1_agent_proto_rawDesc)))
 	})
-	return file_minami_agent_v1_agent_proto_rawDescData
+	return file_minato_agent_v1_agent_proto_rawDescData
 }
 
-var file_minami_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_minami_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
-var file_minami_agent_v1_agent_proto_goTypes = []any{
-	(ActionState)(0),              // 0: minami.agent.v1.ActionState
-	(*InfoRequest)(nil),           // 1: minami.agent.v1.InfoRequest
-	(*InfoResponse)(nil),          // 2: minami.agent.v1.InfoResponse
-	(*HealthRequest)(nil),         // 3: minami.agent.v1.HealthRequest
-	(*HealthResponse)(nil),        // 4: minami.agent.v1.HealthResponse
-	(*ShutdownRequest)(nil),       // 5: minami.agent.v1.ShutdownRequest
-	(*ShutdownResponse)(nil),      // 6: minami.agent.v1.ShutdownResponse
-	(*PlayersRequest)(nil),        // 7: minami.agent.v1.PlayersRequest
-	(*PlayersResponse)(nil),       // 8: minami.agent.v1.PlayersResponse
-	(*Player)(nil),                // 9: minami.agent.v1.Player
-	(*ExecuteActionRequest)(nil),  // 10: minami.agent.v1.ExecuteActionRequest
-	(*ExecuteActionResponse)(nil), // 11: minami.agent.v1.ExecuteActionResponse
-	(*ConsoleClientMessage)(nil),  // 12: minami.agent.v1.ConsoleClientMessage
-	(*ConsoleServerMessage)(nil),  // 13: minami.agent.v1.ConsoleServerMessage
-	(*ActionSchema)(nil),          // 14: minami.agent.v1.ActionSchema
-	(*ParamSchema)(nil),           // 15: minami.agent.v1.ParamSchema
-	(*MetricDescriptor)(nil),      // 16: minami.agent.v1.MetricDescriptor
-	(*ConsoleCommand)(nil),        // 17: minami.agent.v1.ConsoleCommand
-	(*ConsolePing)(nil),           // 18: minami.agent.v1.ConsolePing
-	(*ConsoleLog)(nil),            // 19: minami.agent.v1.ConsoleLog
-	(*ConsoleResponse)(nil),       // 20: minami.agent.v1.ConsoleResponse
-	(*ConsoleStatus)(nil),         // 21: minami.agent.v1.ConsoleStatus
-	(*ConsoleError)(nil),          // 22: minami.agent.v1.ConsoleError
-	nil,                           // 23: minami.agent.v1.HealthResponse.DetailsEntry
-	nil,                           // 24: minami.agent.v1.ExecuteActionRequest.ParamsEntry
-	nil,                           // 25: minami.agent.v1.ActionSchema.ParamsEntry
+var file_minato_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_minato_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_minato_agent_v1_agent_proto_goTypes = []any{
+	(ActionState)(0),              // 0: minato.agent.v1.ActionState
+	(*InfoRequest)(nil),           // 1: minato.agent.v1.InfoRequest
+	(*InfoResponse)(nil),          // 2: minato.agent.v1.InfoResponse
+	(*HealthRequest)(nil),         // 3: minato.agent.v1.HealthRequest
+	(*HealthResponse)(nil),        // 4: minato.agent.v1.HealthResponse
+	(*ShutdownRequest)(nil),       // 5: minato.agent.v1.ShutdownRequest
+	(*ShutdownResponse)(nil),      // 6: minato.agent.v1.ShutdownResponse
+	(*PlayersRequest)(nil),        // 7: minato.agent.v1.PlayersRequest
+	(*PlayersResponse)(nil),       // 8: minato.agent.v1.PlayersResponse
+	(*Player)(nil),                // 9: minato.agent.v1.Player
+	(*ExecuteActionRequest)(nil),  // 10: minato.agent.v1.ExecuteActionRequest
+	(*ExecuteActionResponse)(nil), // 11: minato.agent.v1.ExecuteActionResponse
+	(*ConsoleClientMessage)(nil),  // 12: minato.agent.v1.ConsoleClientMessage
+	(*ConsoleServerMessage)(nil),  // 13: minato.agent.v1.ConsoleServerMessage
+	(*ActionSchema)(nil),          // 14: minato.agent.v1.ActionSchema
+	(*ParamSchema)(nil),           // 15: minato.agent.v1.ParamSchema
+	(*MetricDescriptor)(nil),      // 16: minato.agent.v1.MetricDescriptor
+	(*ConsoleCommand)(nil),        // 17: minato.agent.v1.ConsoleCommand
+	(*ConsolePing)(nil),           // 18: minato.agent.v1.ConsolePing
+	(*ConsoleLog)(nil),            // 19: minato.agent.v1.ConsoleLog
+	(*ConsoleResponse)(nil),       // 20: minato.agent.v1.ConsoleResponse
+	(*ConsoleStatus)(nil),         // 21: minato.agent.v1.ConsoleStatus
+	(*ConsoleError)(nil),          // 22: minato.agent.v1.ConsoleError
+	nil,                           // 23: minato.agent.v1.HealthResponse.DetailsEntry
+	nil,                           // 24: minato.agent.v1.ExecuteActionRequest.ParamsEntry
+	nil,                           // 25: minato.agent.v1.ActionSchema.ParamsEntry
 	(*timestamppb.Timestamp)(nil), // 26: google.protobuf.Timestamp
 	(*anypb.Any)(nil),             // 27: google.protobuf.Any
 }
-var file_minami_agent_v1_agent_proto_depIdxs = []int32{
-	14, // 0: minami.agent.v1.InfoResponse.actions:type_name -> minami.agent.v1.ActionSchema
-	16, // 1: minami.agent.v1.InfoResponse.metrics:type_name -> minami.agent.v1.MetricDescriptor
-	23, // 2: minami.agent.v1.HealthResponse.details:type_name -> minami.agent.v1.HealthResponse.DetailsEntry
-	9,  // 3: minami.agent.v1.PlayersResponse.players:type_name -> minami.agent.v1.Player
-	26, // 4: minami.agent.v1.Player.joined_at:type_name -> google.protobuf.Timestamp
-	24, // 5: minami.agent.v1.ExecuteActionRequest.params:type_name -> minami.agent.v1.ExecuteActionRequest.ParamsEntry
-	0,  // 6: minami.agent.v1.ExecuteActionResponse.state:type_name -> minami.agent.v1.ActionState
-	27, // 7: minami.agent.v1.ExecuteActionResponse.result:type_name -> google.protobuf.Any
-	17, // 8: minami.agent.v1.ConsoleClientMessage.command:type_name -> minami.agent.v1.ConsoleCommand
-	18, // 9: minami.agent.v1.ConsoleClientMessage.ping:type_name -> minami.agent.v1.ConsolePing
-	19, // 10: minami.agent.v1.ConsoleServerMessage.log:type_name -> minami.agent.v1.ConsoleLog
-	20, // 11: minami.agent.v1.ConsoleServerMessage.response:type_name -> minami.agent.v1.ConsoleResponse
-	21, // 12: minami.agent.v1.ConsoleServerMessage.status:type_name -> minami.agent.v1.ConsoleStatus
-	22, // 13: minami.agent.v1.ConsoleServerMessage.error:type_name -> minami.agent.v1.ConsoleError
-	25, // 14: minami.agent.v1.ActionSchema.params:type_name -> minami.agent.v1.ActionSchema.ParamsEntry
-	15, // 15: minami.agent.v1.ActionSchema.ParamsEntry.value:type_name -> minami.agent.v1.ParamSchema
-	1,  // 16: minami.agent.v1.Agent.Info:input_type -> minami.agent.v1.InfoRequest
-	3,  // 17: minami.agent.v1.Agent.HealthCheck:input_type -> minami.agent.v1.HealthRequest
-	5,  // 18: minami.agent.v1.Agent.PrepareShutdown:input_type -> minami.agent.v1.ShutdownRequest
-	7,  // 19: minami.agent.v1.Agent.GetPlayers:input_type -> minami.agent.v1.PlayersRequest
-	10, // 20: minami.agent.v1.Agent.ExecuteAction:input_type -> minami.agent.v1.ExecuteActionRequest
-	12, // 21: minami.agent.v1.Agent.Console:input_type -> minami.agent.v1.ConsoleClientMessage
-	2,  // 22: minami.agent.v1.Agent.Info:output_type -> minami.agent.v1.InfoResponse
-	4,  // 23: minami.agent.v1.Agent.HealthCheck:output_type -> minami.agent.v1.HealthResponse
-	6,  // 24: minami.agent.v1.Agent.PrepareShutdown:output_type -> minami.agent.v1.ShutdownResponse
-	8,  // 25: minami.agent.v1.Agent.GetPlayers:output_type -> minami.agent.v1.PlayersResponse
-	11, // 26: minami.agent.v1.Agent.ExecuteAction:output_type -> minami.agent.v1.ExecuteActionResponse
-	13, // 27: minami.agent.v1.Agent.Console:output_type -> minami.agent.v1.ConsoleServerMessage
+var file_minato_agent_v1_agent_proto_depIdxs = []int32{
+	14, // 0: minato.agent.v1.InfoResponse.actions:type_name -> minato.agent.v1.ActionSchema
+	16, // 1: minato.agent.v1.InfoResponse.metrics:type_name -> minato.agent.v1.MetricDescriptor
+	23, // 2: minato.agent.v1.HealthResponse.details:type_name -> minato.agent.v1.HealthResponse.DetailsEntry
+	9,  // 3: minato.agent.v1.PlayersResponse.players:type_name -> minato.agent.v1.Player
+	26, // 4: minato.agent.v1.Player.joined_at:type_name -> google.protobuf.Timestamp
+	24, // 5: minato.agent.v1.ExecuteActionRequest.params:type_name -> minato.agent.v1.ExecuteActionRequest.ParamsEntry
+	0,  // 6: minato.agent.v1.ExecuteActionResponse.state:type_name -> minato.agent.v1.ActionState
+	27, // 7: minato.agent.v1.ExecuteActionResponse.result:type_name -> google.protobuf.Any
+	17, // 8: minato.agent.v1.ConsoleClientMessage.command:type_name -> minato.agent.v1.ConsoleCommand
+	18, // 9: minato.agent.v1.ConsoleClientMessage.ping:type_name -> minato.agent.v1.ConsolePing
+	19, // 10: minato.agent.v1.ConsoleServerMessage.log:type_name -> minato.agent.v1.ConsoleLog
+	20, // 11: minato.agent.v1.ConsoleServerMessage.response:type_name -> minato.agent.v1.ConsoleResponse
+	21, // 12: minato.agent.v1.ConsoleServerMessage.status:type_name -> minato.agent.v1.ConsoleStatus
+	22, // 13: minato.agent.v1.ConsoleServerMessage.error:type_name -> minato.agent.v1.ConsoleError
+	25, // 14: minato.agent.v1.ActionSchema.params:type_name -> minato.agent.v1.ActionSchema.ParamsEntry
+	15, // 15: minato.agent.v1.ActionSchema.ParamsEntry.value:type_name -> minato.agent.v1.ParamSchema
+	1,  // 16: minato.agent.v1.Agent.Info:input_type -> minato.agent.v1.InfoRequest
+	3,  // 17: minato.agent.v1.Agent.HealthCheck:input_type -> minato.agent.v1.HealthRequest
+	5,  // 18: minato.agent.v1.Agent.PrepareShutdown:input_type -> minato.agent.v1.ShutdownRequest
+	7,  // 19: minato.agent.v1.Agent.GetPlayers:input_type -> minato.agent.v1.PlayersRequest
+	10, // 20: minato.agent.v1.Agent.ExecuteAction:input_type -> minato.agent.v1.ExecuteActionRequest
+	12, // 21: minato.agent.v1.Agent.Console:input_type -> minato.agent.v1.ConsoleClientMessage
+	2,  // 22: minato.agent.v1.Agent.Info:output_type -> minato.agent.v1.InfoResponse
+	4,  // 23: minato.agent.v1.Agent.HealthCheck:output_type -> minato.agent.v1.HealthResponse
+	6,  // 24: minato.agent.v1.Agent.PrepareShutdown:output_type -> minato.agent.v1.ShutdownResponse
+	8,  // 25: minato.agent.v1.Agent.GetPlayers:output_type -> minato.agent.v1.PlayersResponse
+	11, // 26: minato.agent.v1.Agent.ExecuteAction:output_type -> minato.agent.v1.ExecuteActionResponse
+	13, // 27: minato.agent.v1.Agent.Console:output_type -> minato.agent.v1.ConsoleServerMessage
 	22, // [22:28] is the sub-list for method output_type
 	16, // [16:22] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
@@ -1494,16 +1494,16 @@ var file_minami_agent_v1_agent_proto_depIdxs = []int32{
 	0,  // [0:16] is the sub-list for field type_name
 }
 
-func init() { file_minami_agent_v1_agent_proto_init() }
-func file_minami_agent_v1_agent_proto_init() {
-	if File_minami_agent_v1_agent_proto != nil {
+func init() { file_minato_agent_v1_agent_proto_init() }
+func file_minato_agent_v1_agent_proto_init() {
+	if File_minato_agent_v1_agent_proto != nil {
 		return
 	}
-	file_minami_agent_v1_agent_proto_msgTypes[11].OneofWrappers = []any{
+	file_minato_agent_v1_agent_proto_msgTypes[11].OneofWrappers = []any{
 		(*ConsoleClientMessage_Command)(nil),
 		(*ConsoleClientMessage_Ping)(nil),
 	}
-	file_minami_agent_v1_agent_proto_msgTypes[12].OneofWrappers = []any{
+	file_minato_agent_v1_agent_proto_msgTypes[12].OneofWrappers = []any{
 		(*ConsoleServerMessage_Log)(nil),
 		(*ConsoleServerMessage_Response)(nil),
 		(*ConsoleServerMessage_Status)(nil),
@@ -1513,18 +1513,18 @@ func file_minami_agent_v1_agent_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_minami_agent_v1_agent_proto_rawDesc), len(file_minami_agent_v1_agent_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_minato_agent_v1_agent_proto_rawDesc), len(file_minato_agent_v1_agent_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_minami_agent_v1_agent_proto_goTypes,
-		DependencyIndexes: file_minami_agent_v1_agent_proto_depIdxs,
-		EnumInfos:         file_minami_agent_v1_agent_proto_enumTypes,
-		MessageInfos:      file_minami_agent_v1_agent_proto_msgTypes,
+		GoTypes:           file_minato_agent_v1_agent_proto_goTypes,
+		DependencyIndexes: file_minato_agent_v1_agent_proto_depIdxs,
+		EnumInfos:         file_minato_agent_v1_agent_proto_enumTypes,
+		MessageInfos:      file_minato_agent_v1_agent_proto_msgTypes,
 	}.Build()
-	File_minami_agent_v1_agent_proto = out.File
-	file_minami_agent_v1_agent_proto_goTypes = nil
-	file_minami_agent_v1_agent_proto_depIdxs = nil
+	File_minato_agent_v1_agent_proto = out.File
+	file_minato_agent_v1_agent_proto_goTypes = nil
+	file_minato_agent_v1_agent_proto_depIdxs = nil
 }

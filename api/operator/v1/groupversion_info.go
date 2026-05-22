@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package v1 contains API Schema definitions for the operator v1 API group.
 // +kubebuilder:object:generate=true
-// +groupName=operator.minami.io
+// +groupName=operator.minato.io
 package v1
 
 import (
@@ -27,7 +27,7 @@ import (
 var (
 	// SchemeGroupVersion is group version used to register these objects.
 	// This name is used by applyconfiguration generators (e.g. controller-gen).
-	SchemeGroupVersion = schema.GroupVersion{Group: "operator.minami.io", Version: "v1"}
+	SchemeGroupVersion = schema.GroupVersion{Group: "operator.minato.io", Version: "v1"}
 
 	// GroupVersion is an alias for SchemeGroupVersion, for backward compatibility.
 	GroupVersion = SchemeGroupVersion

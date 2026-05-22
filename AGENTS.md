@@ -1,22 +1,22 @@
 ````
-You are helping me build "Minami" (南) — a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers, designed for enterprise use cases: hosting providers running many games for many tenants, and operators running large fleets of persistent worlds for a single game.
+You are helping me build "minato" (南) — a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers, designed for enterprise use cases: hosting providers running many games for many tenants, and operators running large fleets of persistent worlds for a single game.
 
 ## Architecture overview
 
-Minami is composed of four parts:
+minato is composed of four parts:
 
-1. **Minami Operator** (Go, controller-runtime): owns the CRDs. Reconciles them into Kubernetes resources (StatefulSets, PVCs, Services, ServiceMonitors, Secrets). **Game-agnostic** — never imports game-specific code. Highly available, leader-elected.
+1. **minato Operator** (Go, controller-runtime): owns the CRDs. Reconciles them into Kubernetes resources (StatefulSets, PVCs, Services, ServiceMonitors, Secrets). **Game-agnostic** — never imports game-specific code. Highly available, leader-elected.
 
-2. **Minami Agent SDK** (Go module, public and versioned): the contract and toolkit for writing per-game agents. Defines the gRPC interface every agent implements. Provides reusable components (RCON client library, lifecycle hooks, metrics scaffolding, action interpreter for declarative cases). Third parties can use this SDK to write agents for their own games.
+2. **minato Agent SDK** (Go module, public and versioned): the contract and toolkit for writing per-game agents. Defines the gRPC interface every agent implements. Provides reusable components (RCON client library, lifecycle hooks, metrics scaffolding, action interpreter for declarative cases). Third parties can use this SDK to write agents for their own games.
 
-3. **Per-game agents** (separate container images, one per game): sidecars injected into every game server pod. Implement the agent gRPC API. Encapsulate all per-game knowledge — RCON dialects, command syntax, output parsing, lifecycle quirks. Minami ships agents for Minecraft, CS2, Palworld; others can be contributed.
+3. **Per-game agents** (separate container images, one per game): sidecars injected into every game server pod. Implement the agent gRPC API. Encapsulate all per-game knowledge — RCON dialects, command syntax, output parsing, lifecycle quirks. minato ships agents for Minecraft, CS2, Palworld; others can be contributed.
 
-4. **Minami Control Plane** (Go HTTP/gRPC service): the user-facing API for action execution, console streaming, and aggregated operations. Validates requests, enforces auth/RBAC, audits everything, dispatches to agents via the agent gRPC API.
+4. **minato Control Plane** (Go HTTP/gRPC service): the user-facing API for action execution, console streaming, and aggregated operations. Validates requests, enforces auth/RBAC, audits everything, dispatches to agents via the agent gRPC API.
 
 ## Core design principles
 
 - **Persistent-first**: designed for long-lived, stateful game worlds. One GameServer = one StatefulSet replicas:1 = one PVC = one stable identity.
-- **Game knowledge lives in agents, never in the operator**: the central operator has zero game-specific code paths. Adding a new game means publishing an agent image and a GameProfile, not modifying Minami.
+- **Game knowledge lives in agents, never in the operator**: the central operator has zero game-specific code paths. Adding a new game means publishing an agent image and a GameProfile, not modifying minato.
 - **Public, stable agent API**: third parties can write agents. The agent gRPC interface is versioned (semver) and supports multiple versions concurrently.
 - **K8s-native everything**: all state in CRDs and K8s resources. Auth via K8s tokens + OIDC. RBAC via standard ClusterRoles/Roles. Metrics via ServiceMonitor (or PodMonitor). No custom databases.
 - **GitOps-friendly**: every concept is a Kubernetes resource. ArgoCD/Flux manages profiles and servers naturally.
@@ -195,7 +195,7 @@ service Agent {
 }
 ```
 
-The API is versioned via package name (`minami.agent.v1`). New versions are added side-by-side; deprecated versions are supported for at least one minor Minami release after announcement.
+The API is versioned via package name (`minato.agent.v1`). New versions are added side-by-side; deprecated versions are supported for at least one minor minato release after announcement.
 
 ## Tech stack
 
@@ -211,12 +211,12 @@ The API is versioned via package name (`minami.agent.v1`). New versions are adde
 ## Project layout (target)
 
 ```
-minami/
+minato/
 ├── api/
-│   ├── operator/v1/         # Minami CRD Go types
+│   ├── operator/v1/         # minato CRD Go types
 │   └── agent/v1/            # Agent gRPC protobuf definitions
 ├── cmd/
-│   ├── operator/            # Minami operator binary
+│   ├── operator/            # minato operator binary
 │   ├── controlplane/        # Control plane API binary
 │   └── agents/              # Bundled agents
 │       ├── generic/         # YAML-action-interpreting agent
@@ -251,7 +251,7 @@ minami/
 │   └── palworld/
 ├── deploy/
 │   ├── helm/
-│   │   └── minami/          # Helm chart
+│   │   └── minato/          # Helm chart
 │   └── kustomize/
 ├── docs/
 │   ├── architecture/
