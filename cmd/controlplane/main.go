@@ -38,11 +38,11 @@ func main() {
 	// Health endpoints
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	// API v1 routes
@@ -317,7 +317,7 @@ func (api *controlPlaneAPI) getProfile(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, profile)
 }
 
-func respondJSON(w http.ResponseWriter, data interface{}) {
+func respondJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }

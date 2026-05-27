@@ -8,11 +8,9 @@ linters:
     - dupl
     - errcheck
     - ginkgolinter
-    - goconst
     - gocyclo
     - govet
     - ineffassign
-    - lll
     - modernize
     - misspell
     - nakedret
@@ -28,6 +26,8 @@ linters:
       logcheck:
         type: "module"
         description: Checks Go logging calls for Kubernetes logging conventions.
+    gocyclo:
+      min-complexity: 30
     revive:
       rules:
         - name: comment-spacings
@@ -35,16 +35,14 @@ linters:
     modernize:
       disable:
         - omitzero
+    staticcheck:
+      checks:
+        - all
+        - "-SA1019"
+        - "-ST1000"
+        - "-ST1021"
   exclusions:
     generated: lax
-    rules:
-      - linters:
-          - lll
-        path: api/*
-      - linters:
-          - dupl
-          - lll
-        path: internal/*
     paths:
       - third_party$
       - builtin$

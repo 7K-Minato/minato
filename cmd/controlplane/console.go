@@ -53,17 +53,21 @@ func (api *controlPlaneAPI) handleConsole(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Connect to agent via gRPC
 	if err := api.proxyConsole(r.Context(), conn, server); err != nil {
 		// Send error to client
 		msg := ConsoleMessage{Type: "error", Data: err.Error()}
-		conn.WriteJSON(msg)
+		_ = conn.WriteJSON(msg)
 	}
 }
 
-func (api *controlPlaneAPI) proxyConsole(ctx context.Context, wsConn *websocket.Conn, server *operatorv1.GameServer) error {
+func (api *controlPlaneAPI) proxyConsole(
+	ctx context.Context,
+	wsConn *websocket.Conn,
+	server *operatorv1.GameServer,
+) error {
 	// Get service to resolve agent endpoint
 	svc := &corev1.Service{}
 	if err := api.client.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
@@ -72,11 +76,11 @@ func (api *controlPlaneAPI) proxyConsole(ctx context.Context, wsConn *websocket.
 
 	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, 9876)
 
-	grpcConn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcConn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("failed to connect to agent: %w", err)
 	}
-	defer grpcConn.Close()
+	defer func() { _ = grpcConn.Close() }()
 
 	client := agentv1.NewAgentClient(grpcConn)
 	stream, err := client.Console(ctx)

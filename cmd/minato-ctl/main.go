@@ -190,14 +190,14 @@ func consoleCmd() *cobra.Command {
 	return cmd
 }
 
-func getJSON(path string) error {
-	resp, err := http.Get(serverAddr + path)
+func getJSON(apiPath string) error {
+	resp, err := http.Get(serverAddr + apiPath)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	var result interface{}
+	var result any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("%s: %s", resp.Status, string(body))
@@ -208,7 +208,7 @@ func getJSON(path string) error {
 	return nil
 }
 
-func postJSON(path string, data interface{}) error {
+func postJSON(apiPath string, data any) error {
 	var body []byte
 	if data != nil {
 		var err error
@@ -218,13 +218,13 @@ func postJSON(path string, data interface{}) error {
 		}
 	}
 
-	resp, err := http.Post(serverAddr+path, "application/json", bytes.NewReader(body))
+	resp, err := http.Post(serverAddr+apiPath, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	var result interface{}
+	var result any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("%s: %s", resp.Status, string(respBody))
@@ -254,7 +254,7 @@ func runConsole(serverName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	fmt.Printf("Connected to %s console. Type commands, Ctrl+C to exit.\n", serverName)
 

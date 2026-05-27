@@ -31,8 +31,10 @@ type GameSnapshotReconciler struct {
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gamesnapshots/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gamesnapshots/finalizers,verbs=update
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,
+// +kubebuilder:rbac:verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,
+// +kubebuilder:rbac:verbs=get;list;watch;create;update;patch;delete
 
 func (r *GameSnapshotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -64,7 +66,11 @@ func (r *GameSnapshotReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	server := &operatorv1.GameServer{}
-	if err := r.Get(ctx, types.NamespacedName{Name: snap.Spec.GameServerRef, Namespace: snap.Namespace}, server); err != nil {
+	serverKey := types.NamespacedName{
+		Name:      snap.Spec.GameServerRef,
+		Namespace: snap.Namespace,
+	}
+	if err := r.Get(ctx, serverKey, server); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.setCondition(ctx, snap, "Error", metav1.ConditionFalse, "GameServerNotFound", "referenced GameServer not found")
 			return ctrl.Result{}, nil
@@ -104,7 +110,11 @@ func (r *GameSnapshotReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *GameSnapshotReconciler) createSnapshot(ctx context.Context, snap *operatorv1.GameSnapshot, server *operatorv1.GameServer) error {
+func (r *GameSnapshotReconciler) createSnapshot(
+	ctx context.Context,
+	snap *operatorv1.GameSnapshot,
+	server *operatorv1.GameServer,
+) error {
 	logger := log.FromContext(ctx)
 
 	// Find the PVC for this GameServer
@@ -165,7 +175,13 @@ func (r *GameSnapshotReconciler) enforceRetention(ctx context.Context, snap *ope
 	return r.Status().Update(ctx, snap)
 }
 
-func (r *GameSnapshotReconciler) setCondition(ctx context.Context, snap *operatorv1.GameSnapshot, condType string, status metav1.ConditionStatus, reason, message string) {
+func (r *GameSnapshotReconciler) setCondition(
+	ctx context.Context,
+	snap *operatorv1.GameSnapshot,
+	condType string,
+	status metav1.ConditionStatus,
+	reason, message string,
+) {
 	condition := metav1.Condition{
 		Type:               condType,
 		Status:             status,

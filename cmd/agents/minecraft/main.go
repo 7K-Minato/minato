@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -32,22 +30,6 @@ func main() {
 	}
 
 	select {}
-}
-
-func getEnv(key, defaultVal string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultVal
-}
-
-func getEnvInt(key string, defaultVal int) int {
-	if v := os.Getenv(key); v != "" {
-		if i, err := strconv.Atoi(v); err == nil {
-			return i
-		}
-	}
-	return defaultVal
 }
 
 func (a *minecraftAgent) Info(ctx context.Context, req *agentv1.InfoRequest) (*agentv1.InfoResponse, error) {
@@ -130,7 +112,10 @@ func (a *minecraftAgent) HealthCheck(ctx context.Context, req *agentv1.HealthReq
 	return &agentv1.HealthResponse{Ready: true, Message: "healthy"}, nil
 }
 
-func (a *minecraftAgent) PrepareShutdown(ctx context.Context, req *agentv1.ShutdownRequest) (*agentv1.ShutdownResponse, error) {
+func (a *minecraftAgent) PrepareShutdown(
+	ctx context.Context,
+	req *agentv1.ShutdownRequest,
+) (*agentv1.ShutdownResponse, error) {
 	if a.rconClient == nil {
 		return &agentv1.ShutdownResponse{Success: true}, nil
 	}
@@ -151,7 +136,10 @@ func (a *minecraftAgent) PrepareShutdown(ctx context.Context, req *agentv1.Shutd
 	return &agentv1.ShutdownResponse{Success: true}, nil
 }
 
-func (a *minecraftAgent) GetPlayers(ctx context.Context, req *agentv1.PlayersRequest) (*agentv1.PlayersResponse, error) {
+func (a *minecraftAgent) GetPlayers(
+	ctx context.Context,
+	req *agentv1.PlayersRequest,
+) (*agentv1.PlayersResponse, error) {
 	if a.rconClient == nil {
 		return &agentv1.PlayersResponse{Online: 0, Capacity: 20}, nil
 	}
@@ -169,9 +157,15 @@ func (a *minecraftAgent) GetPlayers(ctx context.Context, req *agentv1.PlayersReq
 	}, nil
 }
 
-func (a *minecraftAgent) ExecuteAction(ctx context.Context, req *agentv1.ExecuteActionRequest) (*agentv1.ExecuteActionResponse, error) {
+func (a *minecraftAgent) ExecuteAction(
+	ctx context.Context,
+	req *agentv1.ExecuteActionRequest,
+) (*agentv1.ExecuteActionResponse, error) {
 	if a.rconClient == nil {
-		return &agentv1.ExecuteActionResponse{State: agentv1.ActionState_ACTION_STATE_FAILED, Error: "rcon not configured"}, nil
+		return &agentv1.ExecuteActionResponse{
+			State: agentv1.ActionState_ACTION_STATE_FAILED,
+			Error: "rcon not configured",
+		}, nil
 	}
 
 	var cmd string

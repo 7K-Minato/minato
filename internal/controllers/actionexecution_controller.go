@@ -1,3 +1,4 @@
+// Package controllers contains the Kubernetes controllers for minato CRDs.
 package controllers
 
 import (
@@ -30,7 +31,8 @@ type ActionExecutionReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=operator.minato.io,resources=actionexecutions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=operator.minato.io,resources=actionexecutions,verbs=get;list;watch
+// +kubebuilder:rbac:groups=operator.minato.io,resources=actionexecutions,verbs=create;update;patch;delete
 // +kubebuilder:rbac:groups=operator.minato.io,resources=actionexecutions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=operator.minato.io,resources=actionexecutions/finalizers,verbs=update
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch
@@ -96,7 +98,8 @@ func (r *ActionExecutionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 	if actionDecl == nil {
-		r.setState(ctx, exec, operatorv1.ActionExecutionRejected, "", fmt.Sprintf("action %q not found in profile %q", exec.Spec.ActionName, profile.Name))
+		msg := fmt.Sprintf("action %q not found in profile %q", exec.Spec.ActionName, profile.Name)
+		r.setState(ctx, exec, operatorv1.ActionExecutionRejected, "", msg)
 		return ctrl.Result{}, nil
 	}
 
@@ -126,7 +129,8 @@ func (r *ActionExecutionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	r.setState(ctx, exec, operatorv1.ActionExecutionSucceeded, result, "")
-	logger.Info("action execution completed", "action", exec.Spec.ActionName, "server", server.Name, "state", operatorv1.ActionExecutionSucceeded)
+	logger.Info("action execution completed",
+		"action", exec.Spec.ActionName, "server", server.Name, "state", operatorv1.ActionExecutionSucceeded)
 	return ctrl.Result{}, nil
 }
 
@@ -141,7 +145,12 @@ func (r *ActionExecutionReconciler) validateParams(exec *operatorv1.ActionExecut
 	return nil
 }
 
-func (r *ActionExecutionReconciler) checkConcurrency(ctx context.Context, exec *operatorv1.ActionExecution, server *operatorv1.GameServer, decl *operatorv1.ActionDecl) (bool, string) {
+func (r *ActionExecutionReconciler) checkConcurrency(
+	ctx context.Context,
+	exec *operatorv1.ActionExecution,
+	server *operatorv1.GameServer,
+	decl *operatorv1.ActionDecl,
+) (bool, string) {
 	var actionExecList operatorv1.ActionExecutionList
 	if err := r.List(ctx, &actionExecList, client.InNamespace(server.Namespace)); err != nil {
 		return false, fmt.Sprintf("failed to list action executions: %v", err)
@@ -171,7 +180,12 @@ func (r *ActionExecutionReconciler) checkConcurrency(ctx context.Context, exec *
 	return true, ""
 }
 
-func (r *ActionExecutionReconciler) dispatchToAgent(ctx context.Context, server *operatorv1.GameServer, exec *operatorv1.ActionExecution, timeout time.Duration) (string, error) {
+func (r *ActionExecutionReconciler) dispatchToAgent(
+	ctx context.Context,
+	server *operatorv1.GameServer,
+	exec *operatorv1.ActionExecution,
+	timeout time.Duration,
+) (string, error) {
 	svc := &corev1.Service{}
 	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
 		return "", fmt.Errorf("failed to get service: %w", err)
@@ -182,14 +196,14 @@ func (r *ActionExecutionReconciler) dispatchToAgent(ctx context.Context, server 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to agent: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
-	client := agentv1.NewAgentClient(conn)
-	resp, err := client.ExecuteAction(ctx, &agentv1.ExecuteActionRequest{
+	agentClient := agentv1.NewAgentClient(conn)
+	resp, err := agentClient.ExecuteAction(ctx, &agentv1.ExecuteActionRequest{
 		ActionName:  exec.Spec.ActionName,
 		Params:      exec.Spec.Params,
 		ExecutionId: exec.Name,
@@ -214,7 +228,10 @@ func (r *ActionExecutionReconciler) setState(ctx context.Context, exec *operator
 	if state == operatorv1.ActionExecutionRunning {
 		exec.Status.StartedAt = &now
 	}
-	if state == operatorv1.ActionExecutionSucceeded || state == operatorv1.ActionExecutionFailed || state == operatorv1.ActionExecutionTimedOut || state == operatorv1.ActionExecutionRejected {
+	if state == operatorv1.ActionExecutionSucceeded ||
+		state == operatorv1.ActionExecutionFailed ||
+		state == operatorv1.ActionExecutionTimedOut ||
+		state == operatorv1.ActionExecutionRejected {
 		exec.Status.EndedAt = &now
 	}
 	exec.Status.AgentResponse = result

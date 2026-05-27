@@ -64,7 +64,7 @@ func main() {
 }
 
 func (g *genericAgent) Info(ctx context.Context, req *agentv1.InfoRequest) (*agentv1.InfoResponse, error) {
-	actions := make([]*agentv1.ActionSchema, 0, len(g.catalog.Actions))
+	actionList := make([]*agentv1.ActionSchema, 0, len(g.catalog.Actions))
 	for _, item := range g.catalog.Actions {
 		params := map[string]*agentv1.ParamSchema{}
 		for key, schema := range item.Params {
@@ -75,7 +75,7 @@ func (g *genericAgent) Info(ctx context.Context, req *agentv1.InfoRequest) (*age
 				Default:     schema.Default,
 			}
 		}
-		actions = append(actions, &agentv1.ActionSchema{
+		actionList = append(actionList, &agentv1.ActionSchema{
 			Name:        item.Name,
 			Description: item.Description,
 			Params:      params,
@@ -85,7 +85,7 @@ func (g *genericAgent) Info(ctx context.Context, req *agentv1.InfoRequest) (*age
 	return &agentv1.InfoResponse{
 		Name:    g.name,
 		Version: g.version,
-		Actions: actions,
+		Actions: actionList,
 		Metrics: []*agentv1.MetricDescriptor{},
 	}, nil
 }
@@ -94,30 +94,54 @@ func (g *genericAgent) HealthCheck(ctx context.Context, req *agentv1.HealthReque
 	return &agentv1.HealthResponse{Ready: true, Message: "ok", Details: map[string]string{}}, nil
 }
 
-func (g *genericAgent) PrepareShutdown(ctx context.Context, req *agentv1.ShutdownRequest) (*agentv1.ShutdownResponse, error) {
+func (g *genericAgent) PrepareShutdown(
+	ctx context.Context,
+	req *agentv1.ShutdownRequest,
+) (*agentv1.ShutdownResponse, error) {
 	return &agentv1.ShutdownResponse{Success: true, Error: ""}, nil
 }
 
-func (g *genericAgent) GetPlayers(ctx context.Context, req *agentv1.PlayersRequest) (*agentv1.PlayersResponse, error) {
+func (g *genericAgent) GetPlayers(
+	ctx context.Context,
+	req *agentv1.PlayersRequest,
+) (*agentv1.PlayersResponse, error) {
 	return &agentv1.PlayersResponse{Online: 0, Capacity: 0, Players: nil}, nil
 }
 
-func (g *genericAgent) ExecuteAction(ctx context.Context, req *agentv1.ExecuteActionRequest) (*agentv1.ExecuteActionResponse, error) {
+func (g *genericAgent) ExecuteAction(
+	ctx context.Context,
+	req *agentv1.ExecuteActionRequest,
+) (*agentv1.ExecuteActionResponse, error) {
 	if strings.TrimSpace(req.ActionName) == "" {
-		return &agentv1.ExecuteActionResponse{State: agentv1.ActionState_ACTION_STATE_REJECTED, Error: "action_name required"}, nil
+		return &agentv1.ExecuteActionResponse{
+			State: agentv1.ActionState_ACTION_STATE_REJECTED,
+			Error: "action_name required",
+		}, nil
 	}
 	action, ok := g.catalog.FindAction(req.ActionName)
 	if !ok {
-		return &agentv1.ExecuteActionResponse{State: agentv1.ActionState_ACTION_STATE_REJECTED, Error: "unknown action"}, nil
+		return &agentv1.ExecuteActionResponse{
+			State: agentv1.ActionState_ACTION_STATE_REJECTED,
+			Error: "unknown action",
+		}, nil
 	}
 	if g.runtime == nil {
-		return &agentv1.ExecuteActionResponse{State: agentv1.ActionState_ACTION_STATE_FAILED, Error: "runtime not configured"}, nil
+		return &agentv1.ExecuteActionResponse{
+			State: agentv1.ActionState_ACTION_STATE_FAILED,
+			Error: "runtime not configured",
+		}, nil
 	}
 	result, err := g.executeAction(ctx, action, req.Params)
 	if err != nil {
-		return &agentv1.ExecuteActionResponse{State: agentv1.ActionState_ACTION_STATE_FAILED, Error: err.Error()}, nil
+		return &agentv1.ExecuteActionResponse{
+			State: agentv1.ActionState_ACTION_STATE_FAILED,
+			Error: err.Error(),
+		}, nil
 	}
-	return &agentv1.ExecuteActionResponse{State: agentv1.ActionState_ACTION_STATE_SUCCEEDED, Result: result}, nil
+	return &agentv1.ExecuteActionResponse{
+		State:  agentv1.ActionState_ACTION_STATE_SUCCEEDED,
+		Result: result,
+	}, nil
 }
 
 func (g *genericAgent) Console(stream agentv1.Agent_ConsoleServer) error {
@@ -126,7 +150,11 @@ func (g *genericAgent) Console(stream agentv1.Agent_ConsoleServer) error {
 		if err != nil {
 			return err
 		}
-		payload := &agentv1.ConsoleServerMessage{Payload: &agentv1.ConsoleServerMessage_Response{Response: &agentv1.ConsoleResponse{Response: "ok"}}}
+		payload := &agentv1.ConsoleServerMessage{
+			Payload: &agentv1.ConsoleServerMessage_Response{
+				Response: &agentv1.ConsoleResponse{Response: "ok"},
+			},
+		}
 		_ = msg
 		if err := stream.Send(payload); err != nil {
 			return err
@@ -134,12 +162,18 @@ func (g *genericAgent) Console(stream agentv1.Agent_ConsoleServer) error {
 	}
 }
 
-func (g *genericAgent) executeAction(ctx context.Context, action actions.ActionDefinition, params map[string]string) (*anypb.Any, error) {
+func (g *genericAgent) executeAction(
+	ctx context.Context,
+	action actions.ActionDefinition,
+	params map[string]string,
+) (*anypb.Any, error) {
 	result, err := actions.Execute(ctx, action, params, g.runtime)
 	if err != nil {
 		return nil, err
 	}
-	return anypb.New(&agentv1.ConsoleResponse{Response: strings.Join(mapKeys(result.Outputs), ",")})
+	return anypb.New(&agentv1.ConsoleResponse{
+		Response: strings.Join(mapKeys(result.Outputs), ","),
+	})
 }
 
 func mapKeys(values map[string]string) []string {

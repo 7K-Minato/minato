@@ -159,12 +159,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controllers.GameServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}).SetupWithManager(mgr); err != nil {
+	gsr := &controllers.GameServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	if err := gsr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServer")
 		os.Exit(1)
 	}
 
-	if err := (&controllers.ActionExecutionReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}).SetupWithManager(mgr); err != nil {
+	aer := &controllers.ActionExecutionReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	if err := aer.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "ActionExecution")
 		os.Exit(1)
 	}
@@ -174,7 +176,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controllers.GameServerFleetReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}).SetupWithManager(mgr); err != nil {
+	gfr := &controllers.GameServerFleetReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	if err := gfr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServerFleet")
 		os.Exit(1)
 	}

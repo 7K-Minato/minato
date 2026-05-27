@@ -17,7 +17,7 @@ import (
 )
 
 func TestGameServerReconcileCreatesResources(t *testing.T) {
-	client := k8sManager.GetClient()
+	k8sClient := k8sManager.GetClient()
 
 	profile := &operatorv1.GameProfile{
 		ObjectMeta: metav1.ObjectMeta{Name: "profile"},
@@ -31,7 +31,7 @@ func TestGameServerReconcileCreatesResources(t *testing.T) {
 			Agent:   operatorv1.AgentSpec{Image: "busybox", Version: "0.1.0"},
 		},
 	}
-	if err := client.Create(ctx, profile); err != nil {
+	if err := k8sClient.Create(ctx, profile); err != nil {
 		t.Fatalf("create profile: %v", err)
 	}
 
@@ -39,14 +39,16 @@ func TestGameServerReconcileCreatesResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "server", Namespace: "default"},
 		Spec:       operatorv1.GameServerSpec{Profile: profile.Name},
 	}
-	if err := client.Create(ctx, server); err != nil {
+	if err := k8sClient.Create(ctx, server); err != nil {
 		t.Fatalf("create server: %v", err)
 	}
 
 	sts := &appsv1.StatefulSet{}
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, time.Second*5, true, func(ctx context.Context) (bool, error) {
-		return client.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, sts) == nil, nil
-	}); err != nil {
+	if err := wait.PollUntilContextTimeout(
+		ctx, time.Millisecond*200, time.Second*5, true,
+		func(ctx context.Context) (bool, error) {
+			return k8sClient.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, sts) == nil, nil
+		}); err != nil {
 		t.Fatalf("statefulset not created: %v", err)
 	}
 	if len(sts.Spec.Template.Spec.Containers) != 2 {
@@ -54,7 +56,7 @@ func TestGameServerReconcileCreatesResources(t *testing.T) {
 	}
 
 	svc := &corev1.Service{}
-	if err := client.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
 		t.Fatalf("service not created: %v", err)
 	}
 
@@ -72,15 +74,15 @@ func TestGameServerReconcileCreatesResources(t *testing.T) {
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{}
-	if err := client.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, pvc); err != nil {
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, pvc); err != nil {
 		t.Fatalf("pvc not created: %v", err)
 	}
 
-	if err := bindPVC(ctx, client, pvc, profile.Spec.Storage.SizeDefault); err != nil {
+	if err := bindPVC(ctx, k8sClient, pvc, profile.Spec.Storage.SizeDefault); err != nil {
 		t.Fatalf("bind pvc: %v", err)
 	}
 
-	if err := client.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, pvc); err != nil {
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, pvc); err != nil {
 		t.Fatalf("get pvc: %v", err)
 	}
 	if pvc.Status.Phase != corev1.ClaimBound {
@@ -89,7 +91,7 @@ func TestGameServerReconcileCreatesResources(t *testing.T) {
 }
 
 func TestGameServerFinalizerCleanup(t *testing.T) {
-	client := k8sManager.GetClient()
+	k8sClient := k8sManager.GetClient()
 
 	profile := &operatorv1.GameProfile{
 		ObjectMeta: metav1.ObjectMeta{Name: "profile-cleanup"},
@@ -100,7 +102,7 @@ func TestGameServerFinalizerCleanup(t *testing.T) {
 			Agent:       operatorv1.AgentSpec{Image: "busybox", Version: "0.1.0"},
 		},
 	}
-	if err := client.Create(ctx, profile); err != nil {
+	if err := k8sClient.Create(ctx, profile); err != nil {
 		t.Fatalf("create profile: %v", err)
 	}
 
@@ -108,19 +110,21 @@ func TestGameServerFinalizerCleanup(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "server-cleanup", Namespace: "default"},
 		Spec:       operatorv1.GameServerSpec{Profile: profile.Name},
 	}
-	if err := client.Create(ctx, server); err != nil {
+	if err := k8sClient.Create(ctx, server); err != nil {
 		t.Fatalf("create server: %v", err)
 	}
 
-	if err := client.Delete(ctx, server); err != nil {
+	if err := k8sClient.Delete(ctx, server); err != nil {
 		t.Fatalf("delete server: %v", err)
 	}
 
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, time.Second*10, true, func(ctx context.Context) (bool, error) {
-		gs := &operatorv1.GameServer{}
-		err := client.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, gs)
-		return err != nil, nil
-	}); err != nil {
+	if err := wait.PollUntilContextTimeout(
+		ctx, time.Millisecond*200, time.Second*10, true,
+		func(ctx context.Context) (bool, error) {
+			gs := &operatorv1.GameServer{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, gs)
+			return err != nil, nil
+		}); err != nil {
 		t.Fatalf("gameserver not deleted: %v", err)
 	}
 }
@@ -147,25 +151,27 @@ func bindPVC(ctx context.Context, c client.Client, pvc *corev1.PersistentVolumeC
 	}
 
 	// Retry update to handle conflicts with controller's server-side apply
-	return wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*2, true, func(ctx context.Context) (bool, error) {
-		current := &corev1.PersistentVolumeClaim{}
-		if err := c.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, current); err != nil {
-			return false, err
-		}
-		current.Spec.VolumeName = pv.Name
-		if err := c.Update(ctx, current); err != nil {
-			return false, nil // retry on conflict
-		}
+	return wait.PollUntilContextTimeout(
+		ctx, time.Millisecond*100, time.Second*2, true,
+		func(ctx context.Context) (bool, error) {
+			current := &corev1.PersistentVolumeClaim{}
+			if err := c.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, current); err != nil {
+				return false, err
+			}
+			current.Spec.VolumeName = pv.Name
+			if err := c.Update(ctx, current); err != nil {
+				return false, nil // retry on conflict
+			}
 
-		current.Status.Phase = corev1.ClaimBound
-		if err := c.Status().Update(ctx, current); err != nil {
-			return false, nil // retry on conflict
-		}
+			current.Status.Phase = corev1.ClaimBound
+			if err := c.Status().Update(ctx, current); err != nil {
+				return false, nil // retry on conflict
+			}
 
-		pv.Status.Phase = corev1.VolumeBound
-		if err := c.Status().Update(ctx, pv); err != nil {
-			return false, nil
-		}
-		return true, nil
-	})
+			pv.Status.Phase = corev1.VolumeBound
+			if err := c.Status().Update(ctx, pv); err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
 }

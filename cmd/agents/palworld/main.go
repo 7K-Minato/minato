@@ -45,17 +45,6 @@ func main() {
 	select {}
 }
 
-func getEnvOrDefault(key, defaultVal string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultVal
-}
-
-func getEnvIntOrDefault(key string, defaultVal int) int {
-	return defaultVal
-}
-
 func (a *palworldAgent) Info(ctx context.Context, req *agentv1.InfoRequest) (*agentv1.InfoResponse, error) {
 	actions := []*agentv1.ActionSchema{
 		{Name: "restart", Description: "Restart the server", Params: map[string]*agentv1.ParamSchema{}},
@@ -88,7 +77,10 @@ func (a *palworldAgent) HealthCheck(ctx context.Context, req *agentv1.HealthRequ
 	return &agentv1.HealthResponse{Ready: true, Message: "healthy"}, nil
 }
 
-func (a *palworldAgent) PrepareShutdown(ctx context.Context, req *agentv1.ShutdownRequest) (*agentv1.ShutdownResponse, error) {
+func (a *palworldAgent) PrepareShutdown(
+	ctx context.Context,
+	req *agentv1.ShutdownRequest,
+) (*agentv1.ShutdownResponse, error) {
 	if a.rconClient != nil {
 		_, _ = a.rconClient.Command(ctx, "Broadcast Server_shutting_down...")
 		_, _ = a.rconClient.Command(ctx, "Save")
@@ -101,9 +93,15 @@ func (a *palworldAgent) GetPlayers(ctx context.Context, req *agentv1.PlayersRequ
 	return &agentv1.PlayersResponse{Online: 0, Capacity: 32}, nil
 }
 
-func (a *palworldAgent) ExecuteAction(ctx context.Context, req *agentv1.ExecuteActionRequest) (*agentv1.ExecuteActionResponse, error) {
+func (a *palworldAgent) ExecuteAction(
+	ctx context.Context,
+	req *agentv1.ExecuteActionRequest,
+) (*agentv1.ExecuteActionResponse, error) {
 	if a.rconClient == nil {
-		return &agentv1.ExecuteActionResponse{State: agentv1.ActionState_ACTION_STATE_FAILED, Error: "rcon not configured"}, nil
+		return &agentv1.ExecuteActionResponse{
+			State: agentv1.ActionState_ACTION_STATE_FAILED,
+			Error: "rcon not configured",
+		}, nil
 	}
 
 	var cmd string

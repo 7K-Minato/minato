@@ -29,7 +29,7 @@ const (
 	ActionConcurrencyExclusive ActionConcurrency = "exclusive"
 )
 
-// ParamSchema defines the schema for an action parameter.
+// ActionParamSchema defines the schema for an action parameter.
 type ActionParamSchema struct {
 	// type is the parameter type (string, int, bool).
 	// +optional

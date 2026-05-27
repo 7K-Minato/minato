@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,7 +109,10 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-func (r *GameServerFleetReconciler) buildGameServer(fleet *operatorv1.GameServerFleet, index int32) *operatorv1.GameServer {
+func (r *GameServerFleetReconciler) buildGameServer(
+	fleet *operatorv1.GameServerFleet,
+	index int32,
+) *operatorv1.GameServer {
 	name := fmt.Sprintf("%s-%d", fleet.Name, index)
 
 	labels := map[string]string{
@@ -119,14 +123,10 @@ func (r *GameServerFleetReconciler) buildGameServer(fleet *operatorv1.GameServer
 	}
 
 	// Merge template labels
-	for k, v := range fleet.Spec.Template.Metadata.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, fleet.Spec.Template.Metadata.Labels)
 
 	annotations := map[string]string{}
-	for k, v := range fleet.Spec.Template.Metadata.Annotations {
-		annotations[k] = v
-	}
+	maps.Copy(annotations, fleet.Spec.Template.Metadata.Annotations)
 
 	return &operatorv1.GameServer{
 		ObjectMeta: metav1.ObjectMeta{
@@ -142,7 +142,11 @@ func (r *GameServerFleetReconciler) buildGameServer(fleet *operatorv1.GameServer
 	}
 }
 
-func (r *GameServerFleetReconciler) updateStatus(ctx context.Context, fleet *operatorv1.GameServerFleet, servers []operatorv1.GameServer) error {
+func (r *GameServerFleetReconciler) updateStatus(
+	ctx context.Context,
+	fleet *operatorv1.GameServerFleet,
+	servers []operatorv1.GameServer,
+) error {
 	var readyReplicas, updatedReplicas int32
 
 	for _, server := range servers {

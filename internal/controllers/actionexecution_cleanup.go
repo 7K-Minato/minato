@@ -1,3 +1,4 @@
+// Package controllers contains the Kubernetes controllers for minato CRDs.
 package controllers
 
 import (
@@ -70,7 +71,8 @@ func (t *ActionExecutionCleanupTask) cleanup(ctx context.Context) error {
 		}
 
 		if now.Sub(exec.Status.EndedAt.Time) > ttl {
-			logger.Info("deleting expired ActionExecution", "name", exec.Name, "namespace", exec.Namespace, "state", exec.Status.State)
+			logger.Info("deleting expired ActionExecution",
+				"name", exec.Name, "namespace", exec.Namespace, "state", exec.Status.State)
 			if err := t.Delete(ctx, &exec); err != nil {
 				logger.Error(err, "failed to delete ActionExecution", "name", exec.Name)
 			}

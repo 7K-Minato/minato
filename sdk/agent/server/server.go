@@ -110,15 +110,24 @@ func (h *handler) HealthCheck(ctx context.Context, req *agentv1.HealthRequest) (
 	return h.agent.HealthCheck(ctx, req)
 }
 
-func (h *handler) PrepareShutdown(ctx context.Context, req *agentv1.ShutdownRequest) (*agentv1.ShutdownResponse, error) {
+func (h *handler) PrepareShutdown(
+	ctx context.Context,
+	req *agentv1.ShutdownRequest,
+) (*agentv1.ShutdownResponse, error) {
 	return h.agent.PrepareShutdown(ctx, req)
 }
 
-func (h *handler) GetPlayers(ctx context.Context, req *agentv1.PlayersRequest) (*agentv1.PlayersResponse, error) {
+func (h *handler) GetPlayers(
+	ctx context.Context,
+	req *agentv1.PlayersRequest,
+) (*agentv1.PlayersResponse, error) {
 	return h.agent.GetPlayers(ctx, req)
 }
 
-func (h *handler) ExecuteAction(ctx context.Context, req *agentv1.ExecuteActionRequest) (*agentv1.ExecuteActionResponse, error) {
+func (h *handler) ExecuteAction(
+	ctx context.Context,
+	req *agentv1.ExecuteActionRequest,
+) (*agentv1.ExecuteActionResponse, error) {
 	return h.agent.ExecuteAction(ctx, req)
 }
 
@@ -127,7 +136,12 @@ func (h *handler) Console(stream agentv1.Agent_ConsoleServer) error {
 }
 
 func recoverInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("panic in %s: %v", info.FullMethod, r)

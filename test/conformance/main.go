@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
 )
@@ -16,12 +17,12 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:9876", "agent gRPC address")
 	flag.Parse()
 
-	conn, err := grpc.Dial(*addr, grpc.WithInsecure())
+	conn, err := grpc.NewClient(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		fmt.Printf("connect error: %v\n", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	client := agentv1.NewAgentClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
