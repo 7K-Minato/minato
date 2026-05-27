@@ -29,3 +29,24 @@ spec:
   agent:
     image: "example.com/minato/agent-minecraft:latest"
     version: "0.1.0"
+  actions:
+    - name: restart
+      description: "Gracefully restart the game server"
+      params:
+        reason:
+          type: string
+          required: false
+          description: "Reason for restart"
+      concurrency: serialize
+      timeout: 5m
+    - name: save-world
+      description: "Save the game world"
+      concurrency: exclusive
+      timeout: 2m
+  observability:
+    agentMetrics:
+      port: 9090
+      path: /metrics
+    serviceMonitor:
+      enabled: true
+      interval: 30s

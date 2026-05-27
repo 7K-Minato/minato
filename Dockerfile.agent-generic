@@ -1,0 +1,20 @@
+# Build the generic agent binary
+FROM golang:1.25 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -ldflags='-s -w' -o agent-generic ./cmd/agents/generic
+
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY --from=builder /workspace/agent-generic .
+USER 65532:65532
+
+EXPOSE 9876 9090
+ENTRYPOINT ["/agent-generic"]

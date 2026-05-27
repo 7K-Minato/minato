@@ -164,6 +164,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := (&controllers.ActionExecutionReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "ActionExecution")
+		os.Exit(1)
+	}
+
+	if err := (&controllers.ActionExecutionCleanupTask{Client: mgr.GetClient()}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create ActionExecution cleanup task")
+		os.Exit(1)
+	}
+
+	if err := (&controllers.GameServerFleetReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "GameServerFleet")
+		os.Exit(1)
+	}
+
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up health check")
 		os.Exit(1)

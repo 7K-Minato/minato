@@ -1,151 +1,252 @@
-# minato
+# Minato (南)
 
-minato is a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers. This repository contains the operator API types, agent gRPC contract, and bootstrap scaffolding for the control plane and agents.
+Minato is a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers, designed for enterprise use cases: hosting providers running many games for many tenants, and operators running large fleets of persistent worlds for a single game.
 
-## Quickstart
-```sh
-make generate manifests
-make install
-kubectl apply -f config/samples/
+## Features
+
+- **Persistent-first**: One GameServer = one StatefulSet = one PVC = one stable identity
+- **Game-agnostic operator**: All game knowledge lives in agents, not the operator
+- **Multi-game support**: Minecraft Paper, CS2, Palworld (extensible via SDK)
+- **Fleet management**: GameServerFleet for managing N servers of the same game
+- **Action dispatch**: Execute actions (restart, save, kick, etc.) via CRDs or API
+- **Console streaming**: Real-time console access via WebSocket
+- **Observability**: Prometheus ServiceMonitor integration, standard metric schema
+- **Snapshots**: Declarative backup with retention policies
+- **Multi-tenancy**: Namespace isolation with RBAC roles
+- **Enterprise-ready**: PSS:restricted, non-root, HA, leader election
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Control Plane  │────▶│   Minato Operator │────▶│   Game Servers  │
+│   (HTTP/gRPC)    │     │   (controller)    │     │   (StatefulSet) │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                │                          │
+                                ▼                          ▼
+                       ┌──────────────────┐     ┌─────────────────┐
+                       │   Kubernetes     │     │   Per-Game      │
+                       │   API Server     │     │   Agents        │
+                       └──────────────────┘     └─────────────────┘
 ```
 
-## Getting Started
-
-### Quickstart
-```sh
-make generate manifests
-make install
-kubectl apply -f config/samples/
-```
+## Quick Start
 
 ### Prerequisites
-- Go 1.22+
-- Docker 17.03+
-- kubectl 1.11.3+
-- Access to a Kubernetes 1.11.3+ cluster
-- kind
-- buf
-- protoc-gen-go, protoc-gen-go-grpc
 
-### Setup
-```sh
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.8
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
-```
+- Kubernetes 1.28+ cluster
+- kubectl configured
+- Go 1.22+ (for building from source)
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+### Install CRDs
 
-```sh
-make docker-build docker-push IMG=<some-registry>/minato:tag
-```
-
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
-
-**Install the CRDs into the cluster:**
-
-```sh
+```bash
+git clone https://github.com/7k-group/minato.git
+cd minato
+export PATH=$PATH:$HOME/go/bin
 make install
 ```
 
-**Deploy the Operator to the cluster with the image specified by `IMG`:**
+### Deploy Operator
 
-```sh
-make deploy IMG=<some-registry>/minato:tag
+```bash
+# Build and deploy operator
+make build
+./bin/operator --leader-elect=false
+
+# Or use Helm
+helm install minato ./deploy/helm/minato
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+### Create a Minecraft Server
 
-**Create instances of your solution**
-You can apply the samples (examples) from config/samples:
+```bash
+# Apply the Minecraft Paper profile
+kubectl apply -f profiles/minecraft-paper/profile.yaml
 
-```sh
-kubectl apply -f config/samples/
+# Create a game server
+kubectl apply -f profiles/minecraft-paper/gameserver-example.yaml
+
+# Check status
+kubectl get gameserver minecraft-server-1 -n minato
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+### Use the CLI
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+```bash
+# Build CLI
+make build
 
-```sh
-kubectl delete -f config/samples/
+# List servers
+./bin/minato-ctl server list
+
+# Execute an action
+./bin/minato-ctl server action minecraft-server-1 save-world
+
+# Open console
+./bin/minato-ctl console minecraft-server-1
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
+## CRDs
 
-```sh
-make uninstall
+### GameProfile (Cluster-scoped)
+
+Defines a reusable game configuration:
+
+```yaml
+apiVersion: operator.minato.io/v1
+kind: GameProfile
+metadata:
+  name: minecraft-paper
+spec:
+  displayName: "Minecraft Paper"
+  image: "itzg/minecraft-server:latest"
+  ports:
+    - name: game
+      containerPort: 25565
+  storage:
+    mountPath: /data
+    sizeDefault: 10Gi
+  agent:
+    image: "ghcr.io/7k-group/minato-agent-minecraft:v1.0.0"
 ```
 
-**Undeploy the operator from the cluster:**
+### GameServer (Namespace-scoped)
 
-```sh
-make undeploy
+A single running game server instance:
+
+```yaml
+apiVersion: operator.minato.io/v1
+kind: GameServer
+metadata:
+  name: my-server
+  namespace: minato
+spec:
+  profile: minecraft-paper
+  env:
+    EULA: "true"
 ```
 
-## Project Distribution
+### GameServerFleet (Namespace-scoped)
 
-Following the options to release and provide this solution to the users.
+Manages N GameServers of the same profile:
 
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/minato:tag
+```yaml
+apiVersion: operator.minato.io/v1
+kind: GameServerFleet
+metadata:
+  name: production-fleet
+spec:
+  profile: minecraft-paper
+  replicas: 5
 ```
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
+### ActionExecution (Namespace-scoped)
 
-2. Using the installer
+Audit trail for action execution:
 
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/minato/<tag or branch>/dist/install.yaml
+```yaml
+apiVersion: operator.minato.io/v1
+kind: ActionExecution
+metadata:
+  name: restart-action
+spec:
+  targetRef:
+    kind: GameServer
+    name: my-server
+  actionName: restart
 ```
 
-### By providing a Helm Chart
+### GameSnapshot (Namespace-scoped)
 
-1. Build the chart using the optional helm plugin
+Declarative backups:
 
-```sh
-kubebuilder edit --plugins=helm/v2-alpha
+```yaml
+apiVersion: operator.minato.io/v1
+kind: GameSnapshot
+metadata:
+  name: daily-backup
+spec:
+  gameServerRef: my-server
+  schedule: "0 2 * * *"
+  retention:
+    count: 7
+    duration: "168h"
 ```
 
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
+## Supported Games
 
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
+| Game | Profile | Agent | Status |
+|------|---------|-------|--------|
+| Minecraft Paper | ✅ | ✅ | Production-ready |
+| Counter-Strike 2 | ✅ | 🚧 | Profile ready, agent stub |
+| Palworld | ✅ | 🚧 | Profile ready, agent stub |
+| Generic (YAML actions) | ✅ | ✅ | Production-ready |
 
-## Contributing
-Run `make help` for a full list of targets.
+## Development
+
+```bash
+# Run tests
+make test
+
+# Run integration tests
+make test-integration
+
+# Generate code
+make generate
+
+# Generate manifests
+make manifests
+
+# Run operator locally
+make run-operator
+```
+
+## Documentation
+
+- [Architecture Overview](docs/architecture/overview.md)
+- [Metrics Schema](docs/operations/metrics-schema.md)
+- [Multi-Tenancy](docs/operations/multi-tenancy.md)
+- [Security](docs/operations/security.md)
+- [CLI](docs/operations/cli.md)
+- [Runbooks](docs/operations/runbooks/)
+- [Compliance](docs/operations/compliance/)
+- [Agent Quickstart](docs/agent-developers/quickstart.md)
+- [SDK Reference](docs/agent-developers/sdk-reference.md)
+
+## Helm Installation
+
+```bash
+helm repo add minato https://7k-group.github.io/minato
+helm install minato minato/minato \
+  --set operator.replicas=2 \
+  --set controlPlane.enabled=true
+```
+
+## Enterprise Features
+
+- ✅ High Availability: Leader election, multi-replica operator
+- ✅ Security: PSS:restricted, non-root, no privileged containers
+- ✅ RBAC: Three-tier tenant roles
+- ✅ Audit: ActionExecution audit trail
+- ✅ Monitoring: Prometheus metrics, ServiceMonitor support
+- ✅ Snapshots: VolumeSnapshot integration
+- ✅ Network Isolation: NetworkPolicies
+- ✅ Resource Quotas: Per-tenant limits
+
+## Milestones
+
+- [x] Milestone 1: Project Scaffold, Core CRDs, and Agent Contract
+- [x] Milestone 2: Operator Reconciler and Agent Sidecar Injection
+- [x] Milestone 3: Agent SDK and Generic Agent
+- [x] Milestone 4: Action Dispatch from Operator
+- [x] Milestone 5: Observability (ServiceMonitor, Metrics)
+- [x] Milestone 6: Three Real Agents (Minecraft, CS2, Palworld)
+- [x] Milestone 7: GameServerFleet and Multi-Tenancy
+- [x] Milestone 8: Lifecycle, Snapshots, Control Plane API
+- [x] Milestone 9: Console Streaming and CLI
+- [x] Milestone 10: Enterprise Hardening and Release
 
 ## License
 
-Copyright 2026.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Licensed under the Apache License, Version 2.0.

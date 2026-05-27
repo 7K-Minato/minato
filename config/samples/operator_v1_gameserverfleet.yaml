@@ -1,0 +1,21 @@
+apiVersion: operator.minato.io/v1
+kind: GameServerFleet
+metadata:
+  name: minecraft-fleet
+  namespace: minato
+spec:
+  profile: gameprofile-sample
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        env: production
+    spec:
+      env:
+        EULA: "true"
+        MEMORY: "2G"
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      drainTimeoutSeconds: 300

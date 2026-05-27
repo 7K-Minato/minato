@@ -1,0 +1,120 @@
+apiVersion: operator.minato.io/v1
+kind: GameProfile
+metadata:
+  name: cs2
+  labels:
+    app.kubernetes.io/name: minato
+spec:
+  displayName: "Counter-Strike 2"
+  image: "joedwards32/cs2:latest"
+  imagePullPolicy: IfNotPresent
+  ports:
+    - name: game
+      containerPort: 27015
+      protocol: UDP
+    - name: game-tcp
+      containerPort: 27015
+      protocol: TCP
+    - name: rcon
+      containerPort: 27015
+      protocol: TCP
+    - name: tv
+      containerPort: 27020
+      protocol: UDP
+  environment:
+    - key: SRCDS_TOKEN
+      required: true
+      description: "Steam Game Server Login Token"
+    - key: CS2_SERVERNAME
+      default: "Minato CS2 Server"
+      required: false
+    - key: CS2_MAP
+      default: "de_dust2"
+      required: false
+    - key: CS2_GAMEALIAS
+      default: "casual"
+      required: false
+    - key: CS2_MAXPLAYERS
+      default: "64"
+      required: false
+    - key: CS2_RCONPW
+      default: "minato-rcon"
+      required: false
+  resources:
+    requests:
+      cpu: 1
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  storage:
+    mountPath: /home/steam/cs2-dedicated
+    sizeDefault: 50Gi
+  agent:
+    image: "ghcr.io/7k-group/minato-agent-cs2:v0.1.0"
+    version: "0.1.0"
+  actions:
+    - name: restart
+      description: "Restart the server"
+      concurrency: serialize
+      timeout: 5m
+    - name: change-map
+      description: "Change the current map"
+      params:
+        map:
+          type: string
+          required: true
+          description: "Map name (e.g., de_dust2)"
+      concurrency: serialize
+      timeout: 2m
+    - name: send-message
+      description: "Send a message to all players"
+      params:
+        message:
+          type: string
+          required: true
+      concurrency: allow
+      timeout: 30s
+    - name: kick-player
+      description: "Kick a player"
+      params:
+        player:
+          type: string
+          required: true
+        reason:
+          type: string
+          required: false
+      concurrency: allow
+      timeout: 30s
+    - name: pause-match
+      description: "Pause the current match"
+      concurrency: allow
+      timeout: 30s
+    - name: swap-teams
+      description: "Swap teams"
+      concurrency: allow
+      timeout: 30s
+    - name: set-warmup-time
+      description: "Set warmup time"
+      params:
+        seconds:
+          type: int
+          required: true
+      concurrency: allow
+      timeout: 30s
+    - name: end-warmup
+      description: "End warmup immediately"
+      concurrency: allow
+      timeout: 30s
+  observability:
+    agentMetrics:
+      port: 9090
+      path: /metrics
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+    capabilities:
+      files: false
+      sftp: false
+      backup: false
+      restoreFromSnapshot: false

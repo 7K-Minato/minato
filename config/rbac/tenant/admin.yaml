@@ -1,0 +1,28 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: minato:tenant-admin
+  labels:
+    app.kubernetes.io/name: minato
+    minato.io/role: tenant-admin
+rules:
+# Inherits operator permissions
+- apiGroups: ["operator.minato.io"]
+  resources: ["gameprofiles"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["operator.minato.io"]
+  resources: ["gameservers", "gameserverfleets", "actionexecutions", "gamesnapshots"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["events", "services", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets"]
+  verbs: ["get", "list", "watch"]
+# Admin-specific permissions
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors", "podmonitors"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

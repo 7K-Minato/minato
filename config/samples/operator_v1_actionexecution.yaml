@@ -1,0 +1,15 @@
+apiVersion: operator.minato.io/v1
+kind: ActionExecution
+metadata:
+  name: actionexecution-sample
+  namespace: minato
+spec:
+  targetRef:
+    apiVersion: operator.minato.io/v1
+    kind: GameServer
+    name: gameserver-sample
+    namespace: minato
+  actionName: restart
+  params:
+    reason: "maintenance"
+  caller: "admin"

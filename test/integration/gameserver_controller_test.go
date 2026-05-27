@@ -125,7 +125,7 @@ func TestGameServerFinalizerCleanup(t *testing.T) {
 	}
 }
 
-func bindPVC(ctx context.Context, client client.Client, pvc *corev1.PersistentVolumeClaim, size string) error {
+func bindPVC(ctx context.Context, c client.Client, pvc *corev1.PersistentVolumeClaim, size string) error {
 	pv := &corev1.PersistentVolume{}
 	pv.Name = "pv-" + pvc.Name
 	pv.Spec = corev1.PersistentVolumeSpec{
@@ -142,20 +142,30 @@ func bindPVC(ctx context.Context, client client.Client, pvc *corev1.PersistentVo
 			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/" + pvc.Name},
 		},
 	}
-	if err := client.Create(ctx, pv); err != nil {
+	if err := c.Create(ctx, pv); err != nil {
 		return err
 	}
 
-	pvc.Spec.VolumeName = pv.Name
-	if err := client.Update(ctx, pvc); err != nil {
-		return err
-	}
+	// Retry update to handle conflicts with controller's server-side apply
+	return wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*2, true, func(ctx context.Context) (bool, error) {
+		current := &corev1.PersistentVolumeClaim{}
+		if err := c.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, current); err != nil {
+			return false, err
+		}
+		current.Spec.VolumeName = pv.Name
+		if err := c.Update(ctx, current); err != nil {
+			return false, nil // retry on conflict
+		}
 
-	pvc.Status.Phase = corev1.ClaimBound
-	if err := client.Status().Update(ctx, pvc); err != nil {
-		return err
-	}
+		current.Status.Phase = corev1.ClaimBound
+		if err := c.Status().Update(ctx, current); err != nil {
+			return false, nil // retry on conflict
+		}
 
-	pv.Status.Phase = corev1.VolumeBound
-	return client.Status().Update(ctx, pv)
+		pv.Status.Phase = corev1.VolumeBound
+		if err := c.Status().Update(ctx, pv); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
 }

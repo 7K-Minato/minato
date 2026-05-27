@@ -1,0 +1,118 @@
+apiVersion: operator.minato.io/v1
+kind: GameProfile
+metadata:
+  name: palworld
+  labels:
+    app.kubernetes.io/name: minato
+spec:
+  displayName: "Palworld"
+  image: "thijsvanloef/palworld-server-docker:latest"
+  imagePullPolicy: IfNotPresent
+  ports:
+    - name: game
+      containerPort: 8211
+      protocol: UDP
+    - name: query
+      containerPort: 27015
+      protocol: UDP
+    - name: rcon
+      containerPort: 25575
+      protocol: TCP
+  environment:
+    - key: PUID
+      default: "1000"
+      required: false
+    - key: PGID
+      default: "1000"
+      required: false
+    - key: PORT
+      default: "8211"
+      required: false
+    - key: PLAYERS
+      default: "32"
+      required: false
+    - key: SERVER_PASSWORD
+      required: false
+    - key: MULTITHREADING
+      default: "true"
+      required: false
+    - key: RCON_ENABLED
+      default: "true"
+      required: false
+    - key: RCON_PORT
+      default: "25575"
+      required: false
+    - key: ADMIN_PASSWORD
+      default: "minato-admin"
+      required: false
+    - key: COMMUNITY
+      default: "false"
+      required: false
+    - key: SERVER_NAME
+      default: "Minato Palworld Server"
+      required: false
+    - key: SERVER_DESCRIPTION
+      default: "Hosted by Minato"
+      required: false
+  resources:
+    requests:
+      cpu: 2
+      memory: 8Gi
+    limits:
+      cpu: 8
+      memory: 16Gi
+  storage:
+    mountPath: /palworld
+    sizeDefault: 50Gi
+  agent:
+    image: "ghcr.io/7k-group/minato-agent-palworld:v0.1.0"
+    version: "0.1.0"
+  actions:
+    - name: restart
+      description: "Restart the server"
+      concurrency: serialize
+      timeout: 5m
+    - name: save-world
+      description: "Save the world"
+      concurrency: exclusive
+      timeout: 2m
+    - name: send-message
+      description: "Send a message to all players"
+      params:
+        message:
+          type: string
+          required: true
+      concurrency: allow
+      timeout: 30s
+    - name: kick-player
+      description: "Kick a player"
+      params:
+        player:
+          type: string
+          required: true
+      concurrency: allow
+      timeout: 30s
+    - name: ban-player
+      description: "Ban a player"
+      params:
+        player:
+          type: string
+          required: true
+      concurrency: allow
+      timeout: 30s
+    - name: list-players
+      description: "List online players"
+      concurrency: allow
+      timeout: 30s
+  observability:
+    agentMetrics:
+      port: 9090
+      path: /metrics
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+    capabilities:
+      files: true
+      sftp: true
+      backup: true
+      restoreFromSnapshot: true

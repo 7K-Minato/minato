@@ -20,6 +20,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// LifecycleSpec defines lifecycle settings for a GameServer.
+type LifecycleSpec struct {
+	// idleTimeoutSeconds is the time before auto-shutdown when no players are online.
+	// 0 = never auto-shutdown.
+	// +optional
+	IdleTimeoutSeconds int32 `json:"idleTimeoutSeconds,omitempty"`
+
+	// autoStart controls whether the server starts automatically.
+	// +optional
+	AutoStart bool `json:"autoStart,omitempty"`
+}
+
 // GameServerSpec defines the desired state of GameServer.
 type GameServerSpec struct {
 	// profile references the GameProfile name.
@@ -29,6 +41,10 @@ type GameServerSpec struct {
 	// env provides environment overrides.
 	// +optional
 	Env map[string]string `json:"env,omitempty"`
+
+	// lifecycle defines lifecycle settings.
+	// +optional
+	Lifecycle LifecycleSpec `json:"lifecycle,omitempty"`
 }
 
 // GameServerStatus defines the observed state of GameServer.
@@ -40,6 +56,18 @@ type GameServerStatus struct {
 	// agentVersion is the version reported by the agent.
 	// +optional
 	AgentVersion string `json:"agentVersion,omitempty"`
+
+	// players is the current number of online players.
+	// +optional
+	Players int32 `json:"players,omitempty"`
+
+	// playerCapacity is the maximum number of players.
+	// +optional
+	PlayerCapacity int32 `json:"playerCapacity,omitempty"`
+
+	// lastActivity is the timestamp of last player activity.
+	// +optional
+	LastActivity *metav1.Time `json:"lastActivity,omitempty"`
 
 	// conditions represent the current state of the GameServer resource.
 	// +listType=map

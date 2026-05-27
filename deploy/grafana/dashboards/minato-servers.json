@@ -1,0 +1,80 @@
+{
+  "dashboard": {
+    "title": "Minato Servers",
+    "tags": ["minato"],
+    "timezone": "browser",
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "query",
+          "query": "label_values(minato_gameservers, namespace)"
+        },
+        {
+          "name": "server",
+          "type": "query",
+          "query": "label_values(minato_gameservers{namespace=\"$namespace\"}, server)"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Server State",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "minato_gameservers{namespace=\"$namespace\", server=\"$server\"}",
+            "legendFormat": "{{state}}"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Players",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "minato_players_online{server=\"$server\"}",
+            "legendFormat": "Online"
+          },
+          {
+            "expr": "minato_player_capacity{server=\"$server\"}",
+            "legendFormat": "Capacity"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Agent Health",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "minato_game_responsive{server=\"$server\"}",
+            "legendFormat": "Responsive"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 4,
+        "title": "Actions Executed",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(minato_action_executed_total{server=\"$server\"}[5m])",
+            "legendFormat": "{{action}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

@@ -30,17 +30,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - operator.minato.io
+  - monitoring.coreos.com
   resources:
-  - gameprofiles
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - operator.minato.io
-  resources:
-  - gameservers
+  - servicemonitors
   verbs:
   - create
   - delete
@@ -52,14 +44,55 @@ rules:
 - apiGroups:
   - operator.minato.io
   resources:
+  - actionexecutions
+  - gameserverfleets
+  - gameservers
+  - gamesnapshots
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operator.minato.io
+  resources:
+  - actionexecutions/finalizers
+  - gameserverfleets/finalizers
   - gameservers/finalizers
+  - gamesnapshots/finalizers
   verbs:
   - update
 - apiGroups:
   - operator.minato.io
   resources:
+  - actionexecutions/status
+  - gameserverfleets/status
   - gameservers/status
+  - gamesnapshots/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - operator.minato.io
+  resources:
+  - gameprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

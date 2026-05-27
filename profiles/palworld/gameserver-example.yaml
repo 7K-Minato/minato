@@ -1,0 +1,11 @@
+apiVersion: operator.minato.io/v1
+kind: GameServer
+metadata:
+  name: palworld-server-1
+  namespace: minato
+spec:
+  profile: palworld
+  env:
+    SERVER_NAME: "My Palworld Server"
+    PLAYERS: "32"
+    MULTITHREADING: "true"

@@ -4,6 +4,9 @@
 resources:
 - bases/operator.minato.io_gameprofiles.yaml
 - bases/operator.minato.io_gameservers.yaml
+- bases/operator.minato.io_actionexecutions.yaml
+- bases/operator.minato.io_gameserverfleets.yaml
+- bases/operator.minato.io_gamesnapshots.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

@@ -76,6 +76,77 @@ type StorageSpec struct {
 	SizeDefault string `json:"sizeDefault"`
 }
 
+// AgentMetricsSpec defines the agent metrics endpoint.
+type AgentMetricsSpec struct {
+	// port is the port the agent metrics endpoint is exposed on.
+	// +required
+	Port int32 `json:"port"`
+
+	// path is the path to the metrics endpoint.
+	// +optional
+	Path string `json:"path,omitempty"`
+}
+
+// GameExporterSpec defines an optional game-native metrics exporter.
+type GameExporterSpec struct {
+	// port is the port the exporter is exposed on.
+	// +required
+	Port int32 `json:"port"`
+
+	// path is the path to the exporter metrics endpoint.
+	// +optional
+	Path string `json:"path,omitempty"`
+
+	// scrapeInterval is how often to scrape the exporter.
+	// +optional
+	ScrapeInterval string `json:"scrapeInterval,omitempty"`
+}
+
+// ServiceMonitorSpec defines ServiceMonitor generation settings.
+type ServiceMonitorSpec struct {
+	// enabled controls whether a ServiceMonitor is generated.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// interval is the scrape interval.
+	// +optional
+	Interval string `json:"interval,omitempty"`
+
+	// labels to add to the ServiceMonitor.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// metricRelabelings to apply to scraped metrics.
+	// +optional
+	MetricRelabelings []map[string]string `json:"metricRelabelings,omitempty"`
+}
+
+// PodMonitorSpec defines PodMonitor generation settings.
+type PodMonitorSpec struct {
+	// enabled controls whether a PodMonitor is generated.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+}
+
+// ObservabilitySpec defines observability settings for a GameProfile.
+type ObservabilitySpec struct {
+	// agentMetrics defines the agent metrics endpoint.
+	// +required
+	AgentMetrics AgentMetricsSpec `json:"agentMetrics"`
+
+	// gameExporter defines an optional game-native metrics exporter.
+	// +optional
+	GameExporter *GameExporterSpec `json:"gameExporter,omitempty"`
+
+	// serviceMonitor defines ServiceMonitor generation settings.
+	// +optional
+	ServiceMonitor ServiceMonitorSpec `json:"serviceMonitor,omitempty"`
+
+	// podMonitor defines PodMonitor generation settings.
+	// +optional
+	PodMonitor PodMonitorSpec `json:"podMonitor,omitempty"`
+}
+
 // GameProfileSpec defines the desired state of GameProfile
 type GameProfileSpec struct {
 	// displayName is a human-friendly name for the profile.
@@ -105,6 +176,14 @@ type GameProfileSpec struct {
 	// agent defines the per-game agent sidecar.
 	// +required
 	Agent AgentSpec `json:"agent"`
+
+	// actions defines the declared action catalog.
+	// +optional
+	Actions []ActionDecl `json:"actions,omitempty"`
+
+	// observability defines observability settings.
+	// +optional
+	Observability *ObservabilitySpec `json:"observability,omitempty"`
 }
 
 // GameProfileStatus defines the observed state of GameProfile.

@@ -3,7 +3,11 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -18,12 +22,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
 	operatorv1 "github.com/7k-group/minato/api/operator/v1"
 	"github.com/7k-group/minato/internal/controllers/builder"
 )
 
 const (
-	gameServerFinalizer = "minato.io/gameserver-finalizer"
+	gameServerFinalizer    = "minato.io/gameserver-finalizer"
+	agentHealthCheckPeriod = 30 * time.Second
 )
 
 type GameServerReconciler struct {
@@ -37,6 +43,7 @@ type GameServerReconciler struct {
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameprofiles,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -111,6 +118,20 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	if profile.Spec.Observability != nil && profile.Spec.Observability.ServiceMonitor.Enabled {
+		if DetectPrometheusOperator(ctx, r.Client) {
+			sm := buildServiceMonitor(server, profile, labelsMap)
+			if err := controllerutil.SetControllerReference(server, sm, r.Scheme); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := r.Patch(ctx, sm, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+				logger.Error(err, "failed to reconcile ServiceMonitor")
+			}
+		} else {
+			logger.Info("Prometheus Operator not detected, skipping ServiceMonitor", "profile", profile.Name)
+		}
+	}
+
 	currentSts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, currentSts); err != nil {
 		return ctrl.Result{}, err
@@ -119,6 +140,22 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.updateStatus(ctx, server, ready); err != nil {
 		logger.Error(err, "failed to update GameServer status")
 		return ctrl.Result{}, err
+	}
+
+	if ready {
+		agentVersion, agentHealthy := r.checkAgentHealth(ctx, server)
+		if err := r.updateAgentStatus(ctx, server, agentVersion, agentHealthy); err != nil {
+			logger.Error(err, "failed to update GameServer agent status")
+		}
+
+		// Check idle timeout
+		if server.Spec.Lifecycle.IdleTimeoutSeconds > 0 {
+			if err := r.checkIdleTimeout(ctx, server, currentSts); err != nil {
+				logger.Error(err, "failed to check idle timeout")
+			}
+		}
+
+		return ctrl.Result{RequeueAfter: agentHealthCheckPeriod}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -147,12 +184,14 @@ func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operato
 		state = "Running"
 	}
 
+	now := metav1.Now()
 	readyCondition := metav1.Condition{
 		Type:               "Ready",
 		Status:             boolToConditionStatus(ready),
 		Reason:             "StatefulSetReady",
 		Message:            "",
 		ObservedGeneration: server.Generation,
+		LastTransitionTime: now,
 	}
 
 	agentCondition := metav1.Condition{
@@ -161,6 +200,7 @@ func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operato
 		Reason:             "NotProbed",
 		Message:            "agent reachability not yet implemented",
 		ObservedGeneration: server.Generation,
+		LastTransitionTime: now,
 	}
 
 	server.Status.State = state
@@ -188,6 +228,178 @@ func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *ope
 	}
 
 	return nil
+}
+
+func (r *GameServerReconciler) checkAgentHealth(ctx context.Context, server *operatorv1.GameServer) (string, bool) {
+	logger := log.FromContext(ctx)
+
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
+		logger.Error(err, "failed to get service for agent health check")
+		return "", false
+	}
+
+	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, builder.AgentGRPCPort)
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Error(err, "failed to connect to agent for health check")
+		return "", false
+	}
+	defer conn.Close()
+
+	client := agentv1.NewAgentClient(conn)
+	resp, err := client.HealthCheck(ctx, &agentv1.HealthRequest{})
+	if err != nil {
+		logger.Error(err, "agent health check failed")
+		return "", false
+	}
+
+	infoResp, err := client.Info(ctx, &agentv1.InfoRequest{})
+	if err != nil {
+		logger.Error(err, "agent info request failed")
+		return "", resp.Ready
+	}
+
+	return infoResp.Version, resp.Ready
+}
+
+func (r *GameServerReconciler) updateAgentStatus(ctx context.Context, server *operatorv1.GameServer, version string, healthy bool) error {
+	server.Status.AgentVersion = version
+
+	now := metav1.Now()
+	status := metav1.ConditionTrue
+	reason := "AgentHealthy"
+	message := "agent is reachable and healthy"
+	if !healthy {
+		status = metav1.ConditionFalse
+		reason = "AgentUnhealthy"
+		message = "agent is not healthy"
+	}
+
+	condition := metav1.Condition{
+		Type:               "AgentReachable",
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: server.Generation,
+		LastTransitionTime: now,
+	}
+	setCondition(&server.Status.Conditions, condition)
+
+	return r.Status().Update(ctx, server)
+}
+
+func (r *GameServerReconciler) checkIdleTimeout(ctx context.Context, server *operatorv1.GameServer, sts *appsv1.StatefulSet) error {
+	logger := log.FromContext(ctx)
+
+	// If already scaled to 0, nothing to do
+	if sts.Spec.Replicas != nil && *sts.Spec.Replicas == 0 {
+		return nil
+	}
+
+	// Get player count from agent
+	players, capacity, err := r.getPlayerCount(ctx, server)
+	if err != nil {
+		logger.Error(err, "failed to get player count for idle check")
+		return nil
+	}
+
+	// Update status with player info
+	server.Status.Players = players
+	server.Status.PlayerCapacity = capacity
+	if players > 0 {
+		now := metav1.Now()
+		server.Status.LastActivity = &now
+		server.Status.State = "Running"
+		return r.Status().Update(ctx, server)
+	}
+
+	// Check if we've been idle long enough
+	if server.Status.LastActivity != nil {
+		idleDuration := time.Since(server.Status.LastActivity.Time)
+		timeout := time.Duration(server.Spec.Lifecycle.IdleTimeoutSeconds) * time.Second
+		if idleDuration >= timeout {
+			logger.Info("GameServer idle timeout reached, scaling to 0", "server", server.Name, "idleDuration", idleDuration)
+
+			// Call agent PrepareShutdown
+			if err := r.callAgentShutdown(ctx, server); err != nil {
+				logger.Error(err, "agent shutdown failed, proceeding with scale-down")
+			}
+
+			// Scale StatefulSet to 0
+			stsCopy := sts.DeepCopy()
+			zero := int32(0)
+			stsCopy.Spec.Replicas = &zero
+			if err := r.Update(ctx, stsCopy); err != nil {
+				return fmt.Errorf("failed to scale StatefulSet to 0: %w", err)
+			}
+
+			server.Status.State = "Idle"
+			return r.Status().Update(ctx, server)
+		}
+	} else {
+		// No last activity recorded, set it now
+		now := metav1.Now()
+		server.Status.LastActivity = &now
+		return r.Status().Update(ctx, server)
+	}
+
+	return nil
+}
+
+func (r *GameServerReconciler) getPlayerCount(ctx context.Context, server *operatorv1.GameServer) (int32, int32, error) {
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
+		return 0, 0, err
+	}
+
+	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, builder.AgentGRPCPort)
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return 0, 0, err
+	}
+	defer conn.Close()
+
+	client := agentv1.NewAgentClient(conn)
+	resp, err := client.GetPlayers(ctx, &agentv1.PlayersRequest{})
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return resp.Online, resp.Capacity, nil
+}
+
+func (r *GameServerReconciler) callAgentShutdown(ctx context.Context, server *operatorv1.GameServer) error {
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
+		return err
+	}
+
+	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, builder.AgentGRPCPort)
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	client := agentv1.NewAgentClient(conn)
+	_, err = client.PrepareShutdown(ctx, &agentv1.ShutdownRequest{
+		TimeoutSeconds: 30,
+		DrainReason:    "idle timeout",
+	})
+	return err
 }
 
 func buildStatefulSet(server *operatorv1.GameServer, profile *operatorv1.GameProfile, podSpec corev1.PodSpec, labelsMap map[string]string) *appsv1.StatefulSet {
@@ -313,6 +525,52 @@ func setCondition(conditions *[]metav1.Condition, condition metav1.Condition) {
 		}
 	}
 	*conditions = append(*conditions, condition)
+}
+
+func buildServiceMonitor(server *operatorv1.GameServer, profile *operatorv1.GameProfile, labelsMap map[string]string) *monitoringv1.ServiceMonitor {
+	endpoints := []monitoringv1.Endpoint{
+		{
+			Port:        builder.AgentPortName,
+			Path:        "/metrics",
+			Interval:    monitoringv1.Duration(profile.Spec.Observability.ServiceMonitor.Interval),
+			HonorLabels: true,
+		},
+	}
+
+	if profile.Spec.Observability.GameExporter != nil {
+		endpoints = append(endpoints, monitoringv1.Endpoint{
+			Port:     fmt.Sprintf("exporter-%d", profile.Spec.Observability.GameExporter.Port),
+			Path:     profile.Spec.Observability.GameExporter.Path,
+			Interval: monitoringv1.Duration(profile.Spec.Observability.GameExporter.ScrapeInterval),
+		})
+	}
+
+	smLabels := map[string]string{
+		"minato.io/profile":  profile.Name,
+		"minato.io/server":   server.Name,
+		"minato.io/category": "game",
+	}
+	for k, v := range profile.Spec.Observability.ServiceMonitor.Labels {
+		smLabels[k] = v
+	}
+
+	return &monitoringv1.ServiceMonitor{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: monitoringv1.SchemeGroupVersion.String(),
+			Kind:       "ServiceMonitor",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name,
+			Namespace: server.Namespace,
+			Labels:    smLabels,
+		},
+		Spec: monitoringv1.ServiceMonitorSpec{
+			Selector: metav1.LabelSelector{
+				MatchLabels: labelsMap,
+			},
+			Endpoints: endpoints,
+		},
+	}
 }
 
 func (r *GameServerReconciler) SetupWithManager(mgr ctrl.Manager) error {

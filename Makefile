@@ -113,10 +113,47 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build operator, control plane, and generic agent.
+build: manifests generate fmt vet ## Build operator, control plane, CLI, and generic agent.
 	go build -o bin/operator ./cmd/operator
 	go build -o bin/controlplane ./cmd/controlplane
+	go build -o bin/minato-ctl ./cmd/minato-ctl
 	go build -o bin/agent-generic ./cmd/agents/generic
+
+.PHONY: build-all
+build-all: ## Build all binaries for current platform.
+	mkdir -p bin
+	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/operator ./cmd/operator
+	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/controlplane ./cmd/controlplane
+	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/minato-ctl ./cmd/minato-ctl
+	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/agent-generic ./cmd/agents/generic
+
+.PHONY: docker-build-all
+docker-build-all: ## Build all Docker images.
+	$(CONTAINER_TOOL) build -t $(IMG) .
+	$(CONTAINER_TOOL) build -t $(IMG)-controlplane -f Dockerfile.controlplane .
+	$(CONTAINER_TOOL) build -t $(IMG)-agent-generic -f Dockerfile.agent-generic .
+
+.PHONY: docker-push-all
+docker-push-all: ## Push all Docker images.
+	$(CONTAINER_TOOL) push $(IMG)
+	$(CONTAINER_TOOL) push $(IMG)-controlplane
+	$(CONTAINER_TOOL) push $(IMG)-agent-generic
+
+.PHONY: helm-lint
+helm-lint: ## Lint the Helm chart.
+	helm lint deploy/helm/minato
+
+.PHONY: helm-package
+helm-package: ## Package the Helm chart.
+	mkdir -p dist
+	helm package deploy/helm/minato --destination dist/
+
+.PHONY: verify
+verify: generate manifests test lint ## Run all verification steps.
+	git diff --exit-code || (echo "Generated code is out of date. Run 'make generate manifests' locally." && exit 1)
+
+.PHONY: ci
+ci: verify test-integration ## Run all CI checks.
 
 .PHONY: run-operator
 run-operator: manifests generate fmt vet ## Run the operator from your host.
