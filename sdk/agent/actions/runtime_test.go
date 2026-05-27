@@ -22,3 +22,23 @@ func TestRuntimeInterface(t *testing.T) {
 	var runtime Runtime = &noopRuntime{}
 	_, _ = runtime.RCON(context.Background(), "test")
 }
+
+func TestRuntimeExec(t *testing.T) {
+	var runtime Runtime = &noopRuntime{}
+	_, _ = runtime.Exec(context.Background(), "echo", []string{"hello"})
+}
+
+func TestRuntimeHTTP(t *testing.T) {
+	var runtime Runtime = &noopRuntime{}
+	_, _ = runtime.HTTP(context.Background(), "GET", "http://localhost", "")
+}
+
+func TestRuntimeSignal(t *testing.T) {
+	var runtime Runtime = &noopRuntime{}
+	_ = runtime.Signal(context.Background(), "game", "TERM")
+}
+
+func TestRuntimeSleep(t *testing.T) {
+	var runtime Runtime = &noopRuntime{}
+	_ = runtime.Sleep(context.Background(), 1*time.Millisecond)
+}

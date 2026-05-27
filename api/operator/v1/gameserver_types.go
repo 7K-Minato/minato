@@ -47,6 +47,18 @@ type GameServerSpec struct {
 	Lifecycle LifecycleSpec `json:"lifecycle,omitempty"`
 }
 
+// Endpoint defines a network endpoint for a GameServer.
+type Endpoint struct {
+	// name is the endpoint identifier (e.g., game, agent, filebrowser, sftp).
+	Name string `json:"name"`
+
+	// address is the reachable address.
+	Address string `json:"address"`
+
+	// port is the endpoint port.
+	Port int32 `json:"port"`
+}
+
 // GameServerStatus defines the observed state of GameServer.
 type GameServerStatus struct {
 	// state reflects the current lifecycle state.
@@ -68,6 +80,12 @@ type GameServerStatus struct {
 	// lastActivity is the timestamp of last player activity.
 	// +optional
 	LastActivity *metav1.Time `json:"lastActivity,omitempty"`
+
+	// endpoints lists the available network endpoints for this server.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Endpoints []Endpoint `json:"endpoints,omitempty"`
 
 	// conditions represent the current state of the GameServer resource.
 	// +listType=map

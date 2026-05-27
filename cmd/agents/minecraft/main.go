@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -19,9 +21,31 @@ type minecraftAgent struct {
 }
 
 func main() {
+	host := os.Getenv("RCON_HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := os.Getenv("RCON_PORT")
+	if port == "" {
+		port = "25575"
+	}
+	password := os.Getenv("RCON_PASSWORD")
+
+	var client rcon.Client
+	if password != "" {
+		addr := fmt.Sprintf("%s:%s", host, port)
+		var err error
+		client, err = rcon.NewMinecraftRCONClient(context.Background(), addr, password)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to connect to Minecraft RCON: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	agent := &minecraftAgent{
-		name:    "minato-minecraft",
-		version: "0.1.0",
+		name:       "minato-minecraft",
+		version:    "0.1.0",
+		rconClient: client,
 	}
 
 	_, err := server.Serve(agent, server.Options{})
@@ -244,6 +268,24 @@ func parseMinecraftList(output string) (online, capacity int) {
 	// Try to extract numbers from "There are X of a max Y players online"
 	var x, y int
 	if _, err := fmt.Sscanf(header, "There are %d of a max %d players online", &x, &y); err == nil {
+		return x, y
+	}
+
+	// Fallback: try to find numbers in the string
+	fields := strings.Fields(header)
+	for i, p := range fields {
+		if p == "are" && i+1 < len(fields) {
+			if v, err := strconv.Atoi(fields[i+1]); err == nil {
+				x = v
+			}
+		}
+		if p == "max" && i+1 < len(fields) {
+			if v, err := strconv.Atoi(fields[i+1]); err == nil {
+				y = v
+			}
+		}
+	}
+	if x > 0 || y > 0 {
 		return x, y
 	}
 

@@ -26,6 +26,8 @@ linters:
       logcheck:
         type: "module"
         description: Checks Go logging calls for Kubernetes logging conventions.
+    dupl:
+      threshold: 150
     gocyclo:
       min-complexity: 30
     revive:

@@ -13,6 +13,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -181,6 +182,13 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServerFleet")
 		os.Exit(1)
 	}
+
+	// TODO: implement and register webhook validators once webhook types are available.
+	// Example wiring (commented out until validators are implemented):
+	// if err := (&operatorv1.GameServer{}).SetupWebhookWithManager(mgr); err != nil {
+	//     setupLog.Error(err, "unable to create webhook", "webhook", "GameServer")
+	//     os.Exit(1)
+	// }
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up health check")

@@ -19,6 +19,7 @@ import (
 
 	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
 	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	"github.com/7k-group/minato/internal/controllers/builder"
 )
 
 const (
@@ -191,7 +192,7 @@ func (r *ActionExecutionReconciler) dispatchToAgent(
 		return "", fmt.Errorf("failed to get service: %w", err)
 	}
 
-	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, 9876)
+	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, builder.AgentGRPCPort)
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

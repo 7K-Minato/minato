@@ -75,9 +75,12 @@ minato_players_online / minato_player_capacity > 0.8
 
 ### Prometheus Operator
 
-The operator automatically creates ServiceMonitors when:
-1. Prometheus Operator is detected
-2. `spec.observability.serviceMonitor.enabled: true` in the GameProfile
+Agent metrics are scraped via ServiceMonitors created by a separate Helm chart (not the operator). The operator does not create ServiceMonitors directly.
+
+To enable metrics scraping:
+1. Install the Prometheus Operator in your cluster
+2. Deploy the minato-monitoring Helm chart (or create ServiceMonitors manually)
+3. Agents expose `/metrics` on port 9090 by default
 
 ### Grafana Alloy
 

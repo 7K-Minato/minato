@@ -76,75 +76,23 @@ type StorageSpec struct {
 	SizeDefault string `json:"sizeDefault"`
 }
 
-// AgentMetricsSpec defines the agent metrics endpoint.
-type AgentMetricsSpec struct {
-	// port is the port the agent metrics endpoint is exposed on.
-	// +required
-	Port int32 `json:"port"`
-
-	// path is the path to the metrics endpoint.
+// CapabilitiesSpec defines optional sidecar capabilities for a game profile.
+type CapabilitiesSpec struct {
+	// files enables the filebrowser sidecar.
 	// +optional
-	Path string `json:"path,omitempty"`
-}
+	Files bool `json:"files,omitempty"`
 
-// GameExporterSpec defines an optional game-native metrics exporter.
-type GameExporterSpec struct {
-	// port is the port the exporter is exposed on.
-	// +required
-	Port int32 `json:"port"`
-
-	// path is the path to the exporter metrics endpoint.
+	// sftp enables the sftp sidecar.
 	// +optional
-	Path string `json:"path,omitempty"`
+	SFTP bool `json:"sftp,omitempty"`
 
-	// scrapeInterval is how often to scrape the exporter.
+	// backup enables the backup action.
 	// +optional
-	ScrapeInterval string `json:"scrapeInterval,omitempty"`
-}
+	Backup bool `json:"backup,omitempty"`
 
-// ServiceMonitorSpec defines ServiceMonitor generation settings.
-type ServiceMonitorSpec struct {
-	// enabled controls whether a ServiceMonitor is generated.
+	// restoreFromSnapshot enables restoring from a snapshot.
 	// +optional
-	Enabled bool `json:"enabled,omitempty"`
-
-	// interval is the scrape interval.
-	// +optional
-	Interval string `json:"interval,omitempty"`
-
-	// labels to add to the ServiceMonitor.
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// metricRelabelings to apply to scraped metrics.
-	// +optional
-	MetricRelabelings []map[string]string `json:"metricRelabelings,omitempty"`
-}
-
-// PodMonitorSpec defines PodMonitor generation settings.
-type PodMonitorSpec struct {
-	// enabled controls whether a PodMonitor is generated.
-	// +optional
-	Enabled bool `json:"enabled,omitempty"`
-}
-
-// ObservabilitySpec defines observability settings for a GameProfile.
-type ObservabilitySpec struct {
-	// agentMetrics defines the agent metrics endpoint.
-	// +required
-	AgentMetrics AgentMetricsSpec `json:"agentMetrics"`
-
-	// gameExporter defines an optional game-native metrics exporter.
-	// +optional
-	GameExporter *GameExporterSpec `json:"gameExporter,omitempty"`
-
-	// serviceMonitor defines ServiceMonitor generation settings.
-	// +optional
-	ServiceMonitor ServiceMonitorSpec `json:"serviceMonitor,omitempty"`
-
-	// podMonitor defines PodMonitor generation settings.
-	// +optional
-	PodMonitor PodMonitorSpec `json:"podMonitor,omitempty"`
+	RestoreFromSnapshot bool `json:"restoreFromSnapshot,omitempty"`
 }
 
 // GameProfileSpec defines the desired state of GameProfile
@@ -181,9 +129,9 @@ type GameProfileSpec struct {
 	// +optional
 	Actions []ActionDecl `json:"actions,omitempty"`
 
-	// observability defines observability settings.
+	// capabilities defines optional sidecar capabilities.
 	// +optional
-	Observability *ObservabilitySpec `json:"observability,omitempty"`
+	Capabilities *CapabilitiesSpec `json:"capabilities,omitempty"`
 }
 
 // GameProfileStatus defines the observed state of GameProfile.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -13,8 +14,6 @@ import (
 )
 
 // palworldAgent implements the Minato agent interface for Palworld.
-// This is a stub implementation - full implementation requires a working
-// Palworld dedicated server with RCON support.
 type palworldAgent struct {
 	name       string
 	version    string
@@ -22,13 +21,25 @@ type palworldAgent struct {
 }
 
 func main() {
-	password := os.Getenv("MINATO_RCON_PASSWORD")
+	host := os.Getenv("RCON_HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := os.Getenv("RCON_PORT")
+	if port == "" {
+		port = "25575"
+	}
+	password := os.Getenv("RCON_PASSWORD")
 
 	var client rcon.Client
 	if password != "" {
-		// TODO: Use proper dialer to create Palworld RCON client
-		// client = rcon.NewPalworldClient(client)
-		_ = password
+		addr := fmt.Sprintf("%s:%s", host, port)
+		var err error
+		client, err = rcon.NewSourceRCONClient(context.Background(), addr, password)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to connect to Palworld RCON: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	agent := &palworldAgent{
@@ -74,6 +85,10 @@ func (a *palworldAgent) HealthCheck(ctx context.Context, req *agentv1.HealthRequ
 	if a.rconClient == nil {
 		return &agentv1.HealthResponse{Ready: true, Message: "no rcon configured"}, nil
 	}
+	_, err := a.rconClient.Command(ctx, "Info")
+	if err != nil {
+		return &agentv1.HealthResponse{Ready: false, Message: err.Error()}, nil
+	}
 	return &agentv1.HealthResponse{Ready: true, Message: "healthy"}, nil
 }
 
@@ -90,7 +105,52 @@ func (a *palworldAgent) PrepareShutdown(
 }
 
 func (a *palworldAgent) GetPlayers(ctx context.Context, req *agentv1.PlayersRequest) (*agentv1.PlayersResponse, error) {
-	return &agentv1.PlayersResponse{Online: 0, Capacity: 32}, nil
+	if a.rconClient == nil {
+		return &agentv1.PlayersResponse{Online: 0, Capacity: 32}, nil
+	}
+
+	output, err := a.rconClient.Command(ctx, "ShowPlayers")
+	if err != nil {
+		return &agentv1.PlayersResponse{Online: 0, Capacity: 32}, nil
+	}
+
+	online := parsePalworldPlayerCount(output)
+	players := parsePalworldPlayerList(output)
+
+	return &agentv1.PlayersResponse{
+		Online:   int32(online),
+		Capacity: 32,
+		Players:  players,
+	}, nil
+}
+
+// parsePalworldPlayerCount parses the output of Palworld's "ShowPlayers" command.
+func parsePalworldPlayerCount(output string) int {
+	count := 0
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.Contains(line, "name") {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+// parsePalworldPlayerList parses player names from Palworld ShowPlayers output.
+func parsePalworldPlayerList(output string) []*agentv1.Player {
+	var players []*agentv1.Player
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.Contains(line, "name") {
+			continue
+		}
+		fields := strings.Split(line, ",")
+		if len(fields) > 0 && fields[0] != "" {
+			players = append(players, &agentv1.Player{Name: fields[0]})
+		}
+	}
+	return players
 }
 
 func (a *palworldAgent) ExecuteAction(
@@ -111,7 +171,8 @@ func (a *palworldAgent) ExecuteAction(
 	case "save-world":
 		cmd = "Save"
 	case "send-message":
-		cmd = fmt.Sprintf("Broadcast %s", req.Params["message"])
+		msg := strings.ReplaceAll(req.Params["message"], " ", "_")
+		cmd = fmt.Sprintf("Broadcast %s", msg)
 	case "kick-player":
 		cmd = fmt.Sprintf("KickPlayer %s", req.Params["player"])
 	case "ban-player":
@@ -135,9 +196,21 @@ func (a *palworldAgent) Console(stream agentv1.Agent_ConsoleServer) error {
 		if err != nil {
 			return err
 		}
-		_ = msg
-		_ = stream.Send(&agentv1.ConsoleServerMessage{
-			Payload: &agentv1.ConsoleServerMessage_Response{Response: &agentv1.ConsoleResponse{Response: "ok"}},
-		})
+		if a.rconClient != nil && msg.GetCommand() != nil {
+			output, err := a.rconClient.Command(stream.Context(), msg.GetCommand().RconCommand)
+			if err != nil {
+				_ = stream.Send(&agentv1.ConsoleServerMessage{
+					Payload: &agentv1.ConsoleServerMessage_Error{Error: &agentv1.ConsoleError{Message: err.Error()}},
+				})
+				continue
+			}
+			_ = stream.Send(&agentv1.ConsoleServerMessage{
+				Payload: &agentv1.ConsoleServerMessage_Response{Response: &agentv1.ConsoleResponse{Response: output}},
+			})
+		} else {
+			_ = stream.Send(&agentv1.ConsoleServerMessage{
+				Payload: &agentv1.ConsoleServerMessage_Response{Response: &agentv1.ConsoleResponse{Response: "ok"}},
+			})
+		}
 	}
 }

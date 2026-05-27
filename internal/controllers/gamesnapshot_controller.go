@@ -8,7 +8,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -121,23 +123,53 @@ func (r *GameSnapshotReconciler) createSnapshot(
 		return fmt.Errorf("failed to get PVC: %w", err)
 	}
 
-	// Create VolumeSnapshot (using snapshot.storage.k8s.io/v1)
-	// Note: This requires the VolumeSnapshot CRD to be installed
-	// For now, we create a placeholder entry
 	vsName := fmt.Sprintf("%s-%d", snap.Name, time.Now().Unix())
+
+	// Create VolumeSnapshot using unstructured object to avoid direct CRD dependency
+	volumeSnapshot := &unstructured.Unstructured{}
+	volumeSnapshot.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "snapshot.storage.k8s.io",
+		Version: "v1",
+		Kind:    "VolumeSnapshot",
+	})
+	volumeSnapshot.SetName(vsName)
+	volumeSnapshot.SetNamespace(snap.Namespace)
+	volumeSnapshot.SetLabels(map[string]string{
+		"minato.io/gameserver": server.Name,
+		"minato.io/snapshot":   snap.Name,
+	})
+
+	// Set the source PVC
+	if err := unstructured.SetNestedField(volumeSnapshot.Object, map[string]any{
+		"persistentVolumeClaimName": pvc.Name,
+	}, "spec", "source"); err != nil {
+		return fmt.Errorf("failed to set VolumeSnapshot source: %w", err)
+	}
+
+	// Set owner reference so the VolumeSnapshot is cleaned up when GameSnapshot is deleted
+	if err := controllerutil.SetControllerReference(snap, volumeSnapshot, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference on VolumeSnapshot: %w", err)
+	}
+
+	if err := r.Create(ctx, volumeSnapshot); err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("VolumeSnapshot CRD not installed: %w", err)
+		}
+		return fmt.Errorf("failed to create VolumeSnapshot: %w", err)
+	}
 
 	entry := operatorv1.SnapshotEntry{
 		Name:              vsName,
 		CreatedAt:         metav1.Now(),
 		VolumeSnapshotRef: vsName,
-		SizeBytes:         0, // Would be populated from actual VolumeSnapshot status
+		SizeBytes:         0, // Will be populated from VolumeSnapshot status in future reconcile
 	}
 
 	snap.Status.Snapshots = append(snap.Status.Snapshots, entry)
 	now := metav1.Now()
 	snap.Status.LastSnapshotAt = &now
 
-	logger.Info("created snapshot", "name", vsName, "server", server.Name)
+	logger.Info("created VolumeSnapshot", "name", vsName, "server", server.Name, "pvc", pvc.Name)
 	return r.Status().Update(ctx, snap)
 }
 
@@ -147,6 +179,7 @@ func (r *GameSnapshotReconciler) enforceRetention(ctx context.Context, snap *ope
 	}
 
 	var toKeep []operatorv1.SnapshotEntry
+	var toDelete []operatorv1.SnapshotEntry
 	cutoff := time.Time{}
 	if snap.Spec.Retention.Duration != "" {
 		if d, err := time.ParseDuration(snap.Spec.Retention.Duration); err == nil {
@@ -161,12 +194,30 @@ func (r *GameSnapshotReconciler) enforceRetention(ctx context.Context, snap *ope
 		}
 		if keep {
 			toKeep = append(toKeep, entry)
+		} else {
+			toDelete = append(toDelete, entry)
 		}
 	}
 
 	// Keep only the most recent N snapshots
 	if snap.Spec.Retention.Count > 0 && len(toKeep) > snap.Spec.Retention.Count {
+		toDelete = append(toDelete, toKeep[:len(toKeep)-snap.Spec.Retention.Count]...)
 		toKeep = toKeep[len(toKeep)-snap.Spec.Retention.Count:]
+	}
+
+	// Delete associated VolumeSnapshots
+	for _, entry := range toDelete {
+		vs := &unstructured.Unstructured{}
+		vs.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "snapshot.storage.k8s.io",
+			Version: "v1",
+			Kind:    "VolumeSnapshot",
+		})
+		vs.SetName(entry.VolumeSnapshotRef)
+		vs.SetNamespace(snap.Namespace)
+		if err := r.Delete(ctx, vs); err != nil && !apierrors.IsNotFound(err) {
+			log.FromContext(ctx).Error(err, "failed to delete old VolumeSnapshot", "name", entry.VolumeSnapshotRef)
+		}
 	}
 
 	snap.Status.Snapshots = toKeep

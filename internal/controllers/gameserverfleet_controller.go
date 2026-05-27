@@ -76,6 +76,11 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	desiredReplicas := fleet.Spec.Replicas
 	currentReplicas := int32(len(existingServers.Items))
 
+	updateStrategy := fleet.Spec.UpdateStrategy.Type
+	if updateStrategy == "" {
+		updateStrategy = "RollingUpdate"
+	}
+
 	// Create missing GameServers
 	if currentReplicas < desiredReplicas {
 		for i := currentReplicas; i < desiredReplicas; i++ {
@@ -90,11 +95,11 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	// Delete excess GameServers
+	// Delete excess GameServers respecting update strategy
 	if currentReplicas > desiredReplicas {
-		for i := desiredReplicas; i < currentReplicas; i++ {
-			server := &existingServers.Items[i]
-			if err := r.Delete(ctx, server); err != nil && !apierrors.IsNotFound(err) {
+		serversToDelete := r.selectServersToDelete(existingServers.Items, desiredReplicas, updateStrategy)
+		for _, server := range serversToDelete {
+			if err := r.Delete(ctx, &server); err != nil && !apierrors.IsNotFound(err) {
 				logger.Error(err, "failed to delete GameServer", "name", server.Name)
 				return ctrl.Result{}, err
 			}
@@ -107,6 +112,38 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// selectServersToDelete chooses which GameServers to remove based on the update strategy.
+// For RollingUpdate, it deletes the oldest servers first (by creation timestamp).
+// For OnDelete, it returns an empty slice so the user must delete servers manually.
+func (r *GameServerFleetReconciler) selectServersToDelete(
+	servers []operatorv1.GameServer,
+	desiredReplicas int32,
+	updateStrategy string,
+) []operatorv1.GameServer {
+	if updateStrategy == "OnDelete" {
+		return nil
+	}
+
+	// RollingUpdate (default): sort by creation time ascending and delete the oldest.
+	// For equal timestamps, sort by name to get deterministic ordering.
+	sorted := make([]operatorv1.GameServer, len(servers))
+	copy(sorted, servers)
+	for i := range sorted {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].CreationTimestamp.Before(&sorted[i].CreationTimestamp) ||
+				(sorted[j].CreationTimestamp.Equal(&sorted[i].CreationTimestamp) && sorted[j].Name < sorted[i].Name) {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	excess := int32(len(sorted)) - desiredReplicas
+	if excess <= 0 {
+		return nil
+	}
+	return sorted[:excess]
 }
 
 func (r *GameServerFleetReconciler) buildGameServer(
@@ -169,6 +206,7 @@ func (r *GameServerFleetReconciler) updateStatus(
 		Reason:             "Reconciled",
 		Message:            fmt.Sprintf("%d/%d replicas ready", readyReplicas, fleet.Spec.Replicas),
 		ObservedGeneration: fleet.Generation,
+		LastTransitionTime: metav1.Now(),
 	}
 	setCondition(&fleet.Status.Conditions, condition)
 

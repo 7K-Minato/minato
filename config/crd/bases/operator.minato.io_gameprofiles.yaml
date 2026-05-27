@@ -101,6 +101,22 @@ spec:
                 - image
                 - version
                 type: object
+              capabilities:
+                description: capabilities defines optional sidecar capabilities.
+                properties:
+                  backup:
+                    description: backup enables the backup action.
+                    type: boolean
+                  files:
+                    description: files enables the filebrowser sidecar.
+                    type: boolean
+                  restoreFromSnapshot:
+                    description: restoreFromSnapshot enables restoring from a snapshot.
+                    type: boolean
+                  sftp:
+                    description: sftp enables the sftp sidecar.
+                    type: boolean
+                type: object
               displayName:
                 description: displayName is a human-friendly name for the profile.
                 type: string

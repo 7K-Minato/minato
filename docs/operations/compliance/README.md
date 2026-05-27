@@ -33,7 +33,7 @@ This document maps Minato controls to common compliance frameworks.
 
 **Minato Implementation:**
 - Prometheus metrics for all components
-- ServiceMonitor resources auto-discovered
+- Agent metrics exposed on `/metrics` endpoints for scraping
 - Standard metrics: `minato_operator_reconciliations_total`, `minato_gameservers`, etc.
 
 ### CC7.2 - System Operations Evaluation

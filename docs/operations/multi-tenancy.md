@@ -24,7 +24,7 @@ Cannot modify GameProfiles (platform-managed).
 
 ### minato:tenant-admin
 
-Full access within their namespace, including managing NetworkPolicies and ServiceMonitors.
+Full access within their namespace, including managing NetworkPolicies.
 
 ## Platform Admin
 

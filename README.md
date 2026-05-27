@@ -1,5 +1,11 @@
 # Minato (南)
 
+[![Build Status](https://img.shields.io/github/actions/workflow/status/7k-group/minato/ci.yml?branch=main)](https://github.com/7k-group/minato/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/7k-group/minato)](https://goreportcard.com/report/github.com/7k-group/minato)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](https://github.com/7k-group/minato)
+[![Go Version](https://img.shields.io/badge/go-1.23-blue)](https://golang.org)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 Minato is a Kubernetes-native platform for hosting persistent, multi-game dedicated game servers, designed for enterprise use cases: hosting providers running many games for many tenants, and operators running large fleets of persistent worlds for a single game.
 
 ## Features
@@ -10,8 +16,8 @@ Minato is a Kubernetes-native platform for hosting persistent, multi-game dedica
 - **Fleet management**: GameServerFleet for managing N servers of the same game
 - **Action dispatch**: Execute actions (restart, save, kick, etc.) via CRDs or API
 - **Console streaming**: Real-time console access via WebSocket
-- **Observability**: Prometheus ServiceMonitor integration, standard metric schema
-- **Snapshots**: Declarative backup with retention policies
+- **Agent Metrics**: Agents expose `/metrics` endpoints for Prometheus scraping
+- **Snapshots**: Declarative backup with retention policies using VolumeSnapshots
 - **Multi-tenancy**: Namespace isolation with RBAC roles
 - **Enterprise-ready**: PSS:restricted, non-root, HA, leader election
 
@@ -30,32 +36,36 @@ Minato is a Kubernetes-native platform for hosting persistent, multi-game dedica
                        └──────────────────┘     └─────────────────┘
 ```
 
+The operator reconciles CRDs into Kubernetes resources (StatefulSets, PVCs, Services). Per-game agents run as sidecars and implement the gRPC agent API. The control plane provides an HTTP API for user-facing operations.
+
+**Operator Scope**: The operator manages only minato-native resources (GameServer, GameProfile, GameServerFleet, ActionExecution, GameSnapshot). External resources like ServiceMonitors, Gateways, and Ingress are managed by a separate Helm chart.
+
 ## Quick Start
 
 ### Prerequisites
 
 - Kubernetes 1.28+ cluster
 - kubectl configured
-- Go 1.22+ (for building from source)
+- Go 1.23+ (for building from source)
+- VolumeSnapshot CRD (for backups)
 
-### Install CRDs
+### Install with Helm
+
+```bash
+helm repo add minato https://7k-group.github.io/minato
+helm repo update
+helm install minato minato/minato \
+  --namespace minato-system \
+  --create-namespace
+```
+
+### Install from Source
 
 ```bash
 git clone https://github.com/7k-group/minato.git
 cd minato
-export PATH=$PATH:$HOME/go/bin
 make install
-```
-
-### Deploy Operator
-
-```bash
-# Build and deploy operator
-make build
-./bin/operator --leader-elect=false
-
-# Or use Helm
-helm install minato ./deploy/helm/minato
+make deploy
 ```
 
 ### Create a Minecraft Server
@@ -65,26 +75,33 @@ helm install minato ./deploy/helm/minato
 kubectl apply -f profiles/minecraft-paper/profile.yaml
 
 # Create a game server
-kubectl apply -f profiles/minecraft-paper/gameserver-example.yaml
+kubectl apply -f - <<EOF
+apiVersion: operator.minato.io/v1
+kind: GameServer
+metadata:
+  name: minecraft-server-1
+  namespace: default
+spec:
+  profile: minecraft-paper
+  env:
+    EULA: "true"
+EOF
 
 # Check status
-kubectl get gameserver minecraft-server-1 -n minato
+kubectl get gameserver minecraft-server-1 -n default
 ```
 
-### Use the CLI
+### Use the Control Plane API
 
 ```bash
-# Build CLI
-make build
-
 # List servers
-./bin/minato-ctl server list
+curl http://localhost:8080/api/v1/gameservers
 
 # Execute an action
-./bin/minato-ctl server action minecraft-server-1 save-world
+curl -X POST http://localhost:8080/api/v1/gameservers/default/minecraft-server-1/actions/save-world
 
-# Open console
-./bin/minato-ctl console minecraft-server-1
+# List snapshots
+curl http://localhost:8080/api/v1/gameservers/default/minecraft-server-1/snapshots
 ```
 
 ## CRDs
@@ -108,7 +125,7 @@ spec:
     mountPath: /data
     sizeDefault: 10Gi
   agent:
-    image: "ghcr.io/7k-group/minato-agent-minecraft:v1.0.0"
+    image: "ghcr.io/7k-group/minato-agent-minecraft:v0.1.0"
 ```
 
 ### GameServer (Namespace-scoped)
@@ -120,7 +137,7 @@ apiVersion: operator.minato.io/v1
 kind: GameServer
 metadata:
   name: my-server
-  namespace: minato
+  namespace: default
 spec:
   profile: minecraft-paper
   env:
@@ -159,7 +176,7 @@ spec:
 
 ### GameSnapshot (Namespace-scoped)
 
-Declarative backups:
+Declarative backups with retention:
 
 ```yaml
 apiVersion: operator.minato.io/v1
@@ -179,9 +196,25 @@ spec:
 | Game | Profile | Agent | Status |
 |------|---------|-------|--------|
 | Minecraft Paper | ✅ | ✅ | Production-ready |
-| Counter-Strike 2 | ✅ | 🚧 | Profile ready, agent stub |
-| Palworld | ✅ | 🚧 | Profile ready, agent stub |
+| Counter-Strike 2 | ✅ | ✅ | Production-ready |
+| Palworld | ✅ | ✅ | Production-ready |
 | Generic (YAML actions) | ✅ | ✅ | Production-ready |
+
+## Documentation
+
+- [Installation Guide](docs/operations/installation.md)
+- [Configuration Reference](docs/operations/configuration.md)
+- [Troubleshooting Guide](docs/operations/troubleshooting.md)
+- [Architecture Overview](docs/architecture/overview.md)
+- [Controller Flow](docs/architecture/controller-flow.md)
+- [Metrics Schema](docs/operations/metrics-schema.md)
+- [Multi-Tenancy](docs/operations/multi-tenancy.md)
+- [Security](docs/operations/security.md)
+- [CLI](docs/operations/cli.md)
+- [Runbooks](docs/operations/runbooks/)
+- [Compliance](docs/operations/compliance/)
+- [Agent Quickstart](docs/agent-developers/quickstart.md)
+- [SDK Reference](docs/agent-developers/sdk-reference.md)
 
 ## Development
 
@@ -202,50 +235,38 @@ make manifests
 make run-operator
 ```
 
-## Documentation
+### Project Structure
 
-- [Architecture Overview](docs/architecture/overview.md)
-- [Metrics Schema](docs/operations/metrics-schema.md)
-- [Multi-Tenancy](docs/operations/multi-tenancy.md)
-- [Security](docs/operations/security.md)
-- [CLI](docs/operations/cli.md)
-- [Runbooks](docs/operations/runbooks/)
-- [Compliance](docs/operations/compliance/)
-- [Agent Quickstart](docs/agent-developers/quickstart.md)
-- [SDK Reference](docs/agent-developers/sdk-reference.md)
-
-## Helm Installation
-
-```bash
-helm repo add minato https://7k-group.github.io/minato
-helm install minato minato/minato \
-  --set operator.replicas=2 \
-  --set controlPlane.enabled=true
+```
+minato/
+├── api/                    # CRD Go types and protobuf definitions
+├── cmd/                    # Binaries (operator, control plane, agents, CLI)
+├── internal/controllers/   # Operator reconcilers
+├── sdk/agent/              # Public Agent SDK
+├── profiles/               # Curated GameProfile YAMLs
+├── deploy/helm/            # Helm chart
+├── config/                 # Kustomize configs, CRDs, RBAC
+└── docs/                   # Documentation
 ```
 
 ## Enterprise Features
 
-- ✅ High Availability: Leader election, multi-replica operator
-- ✅ Security: PSS:restricted, non-root, no privileged containers
-- ✅ RBAC: Three-tier tenant roles
-- ✅ Audit: ActionExecution audit trail
-- ✅ Monitoring: Prometheus metrics, ServiceMonitor support
-- ✅ Snapshots: VolumeSnapshot integration
-- ✅ Network Isolation: NetworkPolicies
-- ✅ Resource Quotas: Per-tenant limits
+- ✅ **High Availability**: Leader election, multi-replica operator
+- ✅ **Security**: PSS:restricted, non-root, no privileged containers
+- ✅ **RBAC**: Three-tier tenant roles
+- ✅ **Audit**: ActionExecution audit trail
+- ✅ **Monitoring**: Agent metrics endpoints for Prometheus (external ServiceMonitor chart)
+- ✅ **Snapshots**: VolumeSnapshot integration with retention
+- ✅ **Network Isolation**: NetworkPolicies
+- ✅ **Resource Quotas**: Per-tenant limits
 
-## Milestones
+## Contributing
 
-- [x] Milestone 1: Project Scaffold, Core CRDs, and Agent Contract
-- [x] Milestone 2: Operator Reconciler and Agent Sidecar Injection
-- [x] Milestone 3: Agent SDK and Generic Agent
-- [x] Milestone 4: Action Dispatch from Operator
-- [x] Milestone 5: Observability (ServiceMonitor, Metrics)
-- [x] Milestone 6: Three Real Agents (Minecraft, CS2, Palworld)
-- [x] Milestone 7: GameServerFleet and Multi-Tenancy
-- [x] Milestone 8: Lifecycle, Snapshots, Control Plane API
-- [x] Milestone 9: Console Streaming and CLI
-- [x] Milestone 10: Enterprise Hardening and Release
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Security
+
+For security concerns, please see [SECURITY.md](SECURITY.md).
 
 ## License
 

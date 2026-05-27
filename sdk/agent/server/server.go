@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
 )
@@ -141,17 +143,15 @@ func recoverInterceptor() grpc.UnaryServerInterceptor {
 		req any,
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
-	) (any, error) {
+	) (resp any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("panic in %s: %v", info.FullMethod, r)
+				err = status.Errorf(codes.Internal, "panic: %v", r)
 			}
 		}()
 
-		resp, err := handler(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
+		resp, err = handler(ctx, req)
+		return resp, err
 	}
 }

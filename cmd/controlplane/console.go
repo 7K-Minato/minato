@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -16,9 +17,17 @@ import (
 	operatorv1 "github.com/7k-group/minato/api/operator/v1"
 )
 
+const defaultAgentGRPCPort = 9876
+
+var allowedOrigins = []string{}
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // In production, restrict this
+		origin := r.Header.Get("Origin")
+		if len(allowedOrigins) == 0 {
+			return true // Allow all if no restrictions configured
+		}
+		return slices.Contains(allowedOrigins, origin)
 	},
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -74,7 +83,7 @@ func (api *controlPlaneAPI) proxyConsole(
 		return fmt.Errorf("failed to get service: %w", err)
 	}
 
-	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, 9876)
+	addr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, defaultAgentGRPCPort)
 
 	grpcConn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

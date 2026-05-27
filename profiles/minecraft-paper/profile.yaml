@@ -7,7 +7,6 @@ metadata:
 spec:
   displayName: "Minecraft Paper"
   image: "itzg/minecraft-server:latest"
-  imagePullPolicy: IfNotPresent
   ports:
     - name: game
       containerPort: 25565
@@ -111,19 +110,8 @@ spec:
           required: true
       concurrency: allow
       timeout: 30s
-  observability:
-    agentMetrics:
-      port: 9090
-      path: /metrics
-    gameExporter:
-      port: 9225
-      path: /metrics
-      scrapeInterval: 30s
-    serviceMonitor:
-      enabled: true
-      interval: 30s
-    capabilities:
-      files: true
-      sftp: true
-      backup: true
-      restoreFromSnapshot: true
+  capabilities:
+    files: true
+    sftp: true
+    backup: true
+    restoreFromSnapshot: true
