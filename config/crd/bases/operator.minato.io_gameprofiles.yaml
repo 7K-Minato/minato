@@ -57,7 +57,7 @@ spec:
                       type: string
                     params:
                       additionalProperties:
-                        description: ParamSchema defines the schema for an action
+                        description: ActionParamSchema defines the schema for an action
                           parameter.
                         properties:
                           default:

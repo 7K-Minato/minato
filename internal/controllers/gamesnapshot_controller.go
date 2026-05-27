@@ -31,10 +31,8 @@ type GameSnapshotReconciler struct {
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gamesnapshots/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gamesnapshots/finalizers,verbs=update
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,
-// +kubebuilder:rbac:verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,
-// +kubebuilder:rbac:verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
 
 func (r *GameSnapshotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
