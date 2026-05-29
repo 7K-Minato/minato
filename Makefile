@@ -118,6 +118,9 @@ build: manifests generate fmt vet ## Build operator, control plane, CLI, and gen
 	go build -o bin/controlplane ./cmd/controlplane
 	go build -o bin/minato-ctl ./cmd/minato-ctl
 	go build -o bin/agent-generic ./cmd/agents/generic
+	go build -o bin/agent-minecraft ./cmd/agents/minecraft
+	go build -o bin/agent-cs2 ./cmd/agents/cs2
+	go build -o bin/agent-palworld ./cmd/agents/palworld
 
 .PHONY: build-all
 build-all: ## Build all binaries for current platform.
@@ -126,18 +129,27 @@ build-all: ## Build all binaries for current platform.
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/controlplane ./cmd/controlplane
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/minato-ctl ./cmd/minato-ctl
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/agent-generic ./cmd/agents/generic
+	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/agent-minecraft ./cmd/agents/minecraft
+	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/agent-cs2 ./cmd/agents/cs2
+	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/agent-palworld ./cmd/agents/palworld
 
 .PHONY: docker-build-all
 docker-build-all: ## Build all Docker images.
 	$(CONTAINER_TOOL) build -t $(IMG) .
 	$(CONTAINER_TOOL) build -t $(IMG)-controlplane -f Dockerfile.controlplane .
 	$(CONTAINER_TOOL) build -t $(IMG)-agent-generic -f Dockerfile.agent-generic .
+	$(CONTAINER_TOOL) build -t $(IMG)-agent-minecraft -f Dockerfile.agent-minecraft .
+	$(CONTAINER_TOOL) build -t $(IMG)-agent-cs2 -f Dockerfile.agent-cs2 .
+	$(CONTAINER_TOOL) build -t $(IMG)-agent-palworld -f Dockerfile.agent-palworld .
 
 .PHONY: docker-push-all
 docker-push-all: ## Push all Docker images.
 	$(CONTAINER_TOOL) push $(IMG)
 	$(CONTAINER_TOOL) push $(IMG)-controlplane
 	$(CONTAINER_TOOL) push $(IMG)-agent-generic
+	$(CONTAINER_TOOL) push $(IMG)-agent-minecraft
+	$(CONTAINER_TOOL) push $(IMG)-agent-cs2
+	$(CONTAINER_TOOL) push $(IMG)-agent-palworld
 
 .PHONY: helm-lint
 helm-lint: ## Lint the Helm chart.

@@ -32,6 +32,32 @@ type LifecycleSpec struct {
 	AutoStart bool `json:"autoStart,omitempty"`
 }
 
+// SnapshotRef references a VolumeSnapshot for restoring a GameServer.
+type SnapshotRef struct {
+	// name is the VolumeSnapshot name.
+	// +required
+	Name string `json:"name"`
+
+	// namespace is the VolumeSnapshot namespace.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// GameServerStorage defines storage configuration for a GameServer.
+type GameServerStorage struct {
+	// size overrides the default PVC size.
+	// +optional
+	Size string `json:"size,omitempty"`
+
+	// storageClass overrides the default StorageClass.
+	// +optional
+	StorageClass string `json:"storageClass,omitempty"`
+
+	// snapshotRef references a VolumeSnapshot to restore from.
+	// +optional
+	SnapshotRef *SnapshotRef `json:"snapshotRef,omitempty"`
+}
+
 // GameServerSpec defines the desired state of GameServer.
 type GameServerSpec struct {
 	// profile references the GameProfile name.
@@ -41,6 +67,10 @@ type GameServerSpec struct {
 	// env provides environment overrides.
 	// +optional
 	Env map[string]string `json:"env,omitempty"`
+
+	// storage defines storage overrides.
+	// +optional
+	Storage GameServerStorage `json:"storage,omitempty"`
 
 	// lifecycle defines lifecycle settings.
 	// +optional

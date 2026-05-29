@@ -1,0 +1,78 @@
+name: Reusable Build Images Workflow
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        required: false
+        type: string
+        default: ubuntu-latest
+      push:
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-images:
+    name: Build Container Images
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - component: operator
+            dockerfile: Dockerfile
+            image: ghcr.io/${{ github.repository }}/operator
+          - component: controlplane
+            dockerfile: Dockerfile.controlplane
+            image: ghcr.io/${{ github.repository }}/controlplane
+          - component: agent-generic
+            dockerfile: Dockerfile.agent-generic
+            image: ghcr.io/${{ github.repository }}/agent-generic
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba4eb87ffd # v3.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@988b5a0280414a521a01325bfb0d66a1248e74ba # v3.6.1
+
+      - name: Login to GitHub Container Registry
+        if: inputs.push
+        uses: docker/login-action@9780b0c488f3301e1560dca2e6b7f55c15157618 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5.5.1
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=,suffix=,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@5cd11c3a7ced054e5274721b537bd82f7993d3f8 # v6.7.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ inputs.push }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

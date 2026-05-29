@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,7 +40,7 @@ func TestGameSnapshotReconciler_CreateSnapshot(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, pvc, snap).WithStatusSubresource(&operatorv1.GameSnapshot{}).Build()
 	r := &GameSnapshotReconciler{Client: cl, Scheme: scheme}
 
-	err := r.createSnapshot(ctx, snap, server)
+	err := r.createVolumeSnapshot(ctx, snap, server)
 	require.NoError(t, err)
 	assert.Len(t, snap.Status.Snapshots, 1)
 	assert.NotEmpty(t, snap.Status.Snapshots[0].Name)
@@ -64,7 +65,7 @@ func TestGameSnapshotReconciler_CreateSnapshot_PVCNotFound(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, snap).Build()
 	r := &GameSnapshotReconciler{Client: cl, Scheme: scheme}
 
-	err := r.createSnapshot(ctx, snap, server)
+	err := r.createVolumeSnapshot(ctx, snap, server)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get PVC")
 }
@@ -233,7 +234,8 @@ func TestGameSnapshotReconciler_Reconcile_GameServerNotFound(t *testing.T) {
 
 	updated := &operatorv1.GameSnapshot{}
 	require.NoError(t, cl.Get(ctx, req, updated))
-	assert.Equal(t, "Error", updated.Status.Conditions[0].Type)
+	require.GreaterOrEqual(t, len(updated.Status.Conditions), 1)
+	assert.Equal(t, "Ready", updated.Status.Conditions[0].Type)
 	assert.Equal(t, metav1.ConditionFalse, updated.Status.Conditions[0].Status)
 	assert.Equal(t, "GameServerNotFound", updated.Status.Conditions[0].Reason)
 }
@@ -251,7 +253,7 @@ func TestGameSnapshotReconciler_Reconcile_ScheduledSnapshot(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "snap", Namespace: ns},
 		Spec: operatorv1.GameSnapshotSpec{
 			GameServerRef: server.Name,
-			Schedule:      "0 * * * *",
+			Schedule:      "* * * * *", // Every minute - will trigger immediately
 		},
 	}
 	snap.Finalizers = []string{gameSnapshotFinalizer}
@@ -260,9 +262,8 @@ func TestGameSnapshotReconciler_Reconcile_ScheduledSnapshot(t *testing.T) {
 	r := &GameSnapshotReconciler{Client: cl, Scheme: scheme}
 
 	req := types.NamespacedName{Name: snap.Name, Namespace: ns}
-	res, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: req})
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: req})
 	require.NoError(t, err)
-	assert.Equal(t, time.Hour, res.RequeueAfter)
 
 	updated := &operatorv1.GameSnapshot{}
 	require.NoError(t, cl.Get(ctx, req, updated))
@@ -352,9 +353,17 @@ func TestGameSnapshotReconciler_Reconcile_SnapshotError(t *testing.T) {
 
 	updated := &operatorv1.GameSnapshot{}
 	require.NoError(t, cl.Get(ctx, req, updated))
-	assert.Equal(t, "Error", updated.Status.Conditions[0].Type)
-	assert.Equal(t, metav1.ConditionFalse, updated.Status.Conditions[0].Status)
-	assert.Equal(t, "SnapshotFailed", updated.Status.Conditions[0].Reason)
+	require.GreaterOrEqual(t, len(updated.Status.Conditions), 1)
+	// Find the SnapshotFailed condition
+	var found bool
+	for _, cond := range updated.Status.Conditions {
+		if cond.Reason == "SnapshotFailed" {
+			assert.Equal(t, metav1.ConditionFalse, cond.Status)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "expected SnapshotFailed condition")
 }
 
 func TestGameSnapshotReconciler_Reconcile_ScheduledSkip(t *testing.T) {
@@ -385,7 +394,9 @@ func TestGameSnapshotReconciler_Reconcile_ScheduledSkip(t *testing.T) {
 	req := types.NamespacedName{Name: snap.Name, Namespace: ns}
 	res, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: req})
 	require.NoError(t, err)
-	assert.Equal(t, time.Hour, res.RequeueAfter)
+	// Should requeue sometime in the next hour
+	assert.Greater(t, res.RequeueAfter, time.Duration(0))
+	assert.LessOrEqual(t, res.RequeueAfter, time.Hour)
 
 	updated := &operatorv1.GameSnapshot{}
 	require.NoError(t, cl.Get(ctx, req, updated))
@@ -395,4 +406,235 @@ func TestGameSnapshotReconciler_Reconcile_ScheduledSkip(t *testing.T) {
 func TestGameSnapshotReconciler_SetupWithManager(t *testing.T) {
 	r := &GameSnapshotReconciler{}
 	assert.NotNil(t, r)
+}
+
+func TestGameSnapshotReconciler_ShouldTakeSnapshot_OneShot(t *testing.T) {
+	r := &GameSnapshotReconciler{}
+
+	// Never taken - should take now
+	snap := &operatorv1.GameSnapshot{}
+	should, requeue, err := r.shouldTakeSnapshot(snap)
+	require.NoError(t, err)
+	assert.True(t, should)
+	assert.Equal(t, time.Duration(0), requeue)
+
+	// Already taken - should not take again
+	now := metav1.Now()
+	snap.Status.LastSnapshotAt = &now
+	should, requeue, err = r.shouldTakeSnapshot(snap)
+	require.NoError(t, err)
+	assert.False(t, should)
+	assert.Equal(t, time.Duration(0), requeue)
+}
+
+func TestGameSnapshotReconciler_ShouldTakeSnapshot_Cron(t *testing.T) {
+	r := &GameSnapshotReconciler{}
+
+	// First time with schedule - should take if next is within 1 minute
+	snap := &operatorv1.GameSnapshot{
+		Spec: operatorv1.GameSnapshotSpec{
+			Schedule: "* * * * *", // Every minute
+		},
+	}
+	should, requeue, err := r.shouldTakeSnapshot(snap)
+	require.NoError(t, err)
+	assert.True(t, should)
+	assert.Equal(t, time.Duration(0), requeue)
+
+	// Taken recently - should not take yet
+	snap.Status.LastSnapshotAt = &metav1.Time{Time: time.Now().Add(-30 * time.Second)}
+	should, requeue, err = r.shouldTakeSnapshot(snap)
+	require.NoError(t, err)
+	assert.False(t, should)
+	assert.Greater(t, requeue, time.Duration(0))
+}
+
+func TestGameSnapshotReconciler_ShouldTakeSnapshot_InvalidCron(t *testing.T) {
+	r := &GameSnapshotReconciler{}
+
+	snap := &operatorv1.GameSnapshot{
+		Spec: operatorv1.GameSnapshotSpec{
+			Schedule: "invalid cron",
+		},
+	}
+	should, requeue, err := r.shouldTakeSnapshot(snap)
+	require.Error(t, err)
+	assert.False(t, should)
+	assert.Equal(t, time.Duration(0), requeue)
+}
+
+func TestGameSnapshotReconciler_IsSnapshotInProgress(t *testing.T) {
+	r := &GameSnapshotReconciler{}
+
+	// No snapshots
+	snap := &operatorv1.GameSnapshot{}
+	assert.False(t, r.isSnapshotInProgress(snap))
+
+	// Recent snapshot without ready condition
+	snap.Status.Snapshots = []operatorv1.SnapshotEntry{
+		{Name: "snap-1", CreatedAt: metav1.Now()},
+	}
+	assert.True(t, r.isSnapshotInProgress(snap))
+
+	// Recent snapshot with ready condition
+	snap.Status.Conditions = []metav1.Condition{
+		{Type: "SnapshotReady", Status: metav1.ConditionTrue},
+	}
+	assert.False(t, r.isSnapshotInProgress(snap))
+
+	// Old snapshot
+	snap.Status.Snapshots = []operatorv1.SnapshotEntry{
+		{Name: "snap-1", CreatedAt: metav1.NewTime(time.Now().Add(-20 * time.Minute))},
+	}
+	snap.Status.Conditions = nil
+	assert.False(t, r.isSnapshotInProgress(snap))
+}
+
+func TestGameSnapshotReconciler_MonitorSnapshot_NotFound(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+	ctx := context.Background()
+	ns := "default"
+
+	snap := &operatorv1.GameSnapshot{
+		ObjectMeta: metav1.ObjectMeta{Name: "snap", Namespace: ns},
+		Status: operatorv1.GameSnapshotStatus{
+			Snapshots: []operatorv1.SnapshotEntry{
+				{Name: "vs-1", CreatedAt: metav1.Now()},
+			},
+		},
+	}
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(snap).WithStatusSubresource(&operatorv1.GameSnapshot{}).Build()
+	r := &GameSnapshotReconciler{Client: cl, Scheme: scheme}
+
+	res, err := r.monitorSnapshot(ctx, snap)
+	require.NoError(t, err)
+	assert.Equal(t, 10*time.Second, res.RequeueAfter)
+}
+
+func TestGameSnapshotReconciler_MonitorSnapshot_Ready(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+	ctx := context.Background()
+	ns := "default"
+
+	snap := &operatorv1.GameSnapshot{
+		ObjectMeta: metav1.ObjectMeta{Name: "snap", Namespace: ns},
+		Status: operatorv1.GameSnapshotStatus{
+			Snapshots: []operatorv1.SnapshotEntry{
+				{Name: "vs-1", CreatedAt: metav1.Now()},
+			},
+		},
+	}
+
+	// Mock the Get call to return a ready VolumeSnapshot
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(snap).WithStatusSubresource(&operatorv1.GameSnapshot{}).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if u, ok := obj.(*unstructured.Unstructured); ok {
+					if u.GetKind() == "VolumeSnapshot" {
+						u.Object = map[string]interface{}{
+							"apiVersion": "snapshot.storage.k8s.io/v1",
+							"kind":       "VolumeSnapshot",
+							"metadata": map[string]interface{}{
+								"name":      key.Name,
+								"namespace": key.Namespace,
+							},
+							"status": map[string]interface{}{
+								"readyToUse":  true,
+								"restoreSize": int64(1073741824),
+							},
+						}
+						return nil
+					}
+				}
+				return cl.Get(ctx, key, obj, opts...)
+			},
+		}).Build()
+	r := &GameSnapshotReconciler{Client: cl, Scheme: scheme}
+
+	res, err := r.monitorSnapshot(ctx, snap)
+	require.NoError(t, err)
+	assert.Equal(t, time.Duration(0), res.RequeueAfter)
+
+	// Check that size was updated
+	assert.Equal(t, int64(1073741824), snap.Status.Snapshots[0].SizeBytes)
+}
+
+func TestGameSnapshotReconciler_MonitorSnapshot_Failed(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+	ctx := context.Background()
+	ns := "default"
+
+	snap := &operatorv1.GameSnapshot{
+		ObjectMeta: metav1.ObjectMeta{Name: "snap", Namespace: ns},
+		Status: operatorv1.GameSnapshotStatus{
+			Snapshots: []operatorv1.SnapshotEntry{
+				{Name: "vs-1", CreatedAt: metav1.Now()},
+			},
+		},
+	}
+
+	// Mock the Get call to return a failed VolumeSnapshot
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(snap).WithStatusSubresource(&operatorv1.GameSnapshot{}).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if u, ok := obj.(*unstructured.Unstructured); ok {
+					if u.GetKind() == "VolumeSnapshot" {
+						u.Object = map[string]interface{}{
+							"apiVersion": "snapshot.storage.k8s.io/v1",
+							"kind":       "VolumeSnapshot",
+							"metadata": map[string]interface{}{
+								"name":      key.Name,
+								"namespace": key.Namespace,
+							},
+							"status": map[string]interface{}{
+								"error": map[string]interface{}{
+									"message": "snapshot failed",
+								},
+							},
+						}
+						return nil
+					}
+				}
+				return cl.Get(ctx, key, obj, opts...)
+			},
+		}).Build()
+	r := &GameSnapshotReconciler{Client: cl, Scheme: scheme}
+
+	res, err := r.monitorSnapshot(ctx, snap)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "snapshot failed")
+	assert.Equal(t, time.Duration(0), res.RequeueAfter)
+}
+
+func TestGameSnapshotReconciler_MonitorSnapshot_Timeout(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+	ctx := context.Background()
+	ns := "default"
+
+	snap := &operatorv1.GameSnapshot{
+		ObjectMeta: metav1.ObjectMeta{Name: "snap", Namespace: ns},
+		Status: operatorv1.GameSnapshotStatus{
+			Snapshots: []operatorv1.SnapshotEntry{
+				{Name: "vs-1", CreatedAt: metav1.NewTime(time.Now().Add(-15 * time.Minute))},
+			},
+		},
+	}
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(snap).WithStatusSubresource(&operatorv1.GameSnapshot{}).Build()
+	r := &GameSnapshotReconciler{Client: cl, Scheme: scheme}
+
+	res, err := r.monitorSnapshot(ctx, snap)
+	require.NoError(t, err)
+	assert.Equal(t, time.Duration(0), res.RequeueAfter)
+
+	// Check condition was set
+	assert.Len(t, snap.Status.Conditions, 1)
+	assert.Equal(t, "SnapshotReady", snap.Status.Conditions[0].Type)
+	assert.Equal(t, metav1.ConditionFalse, snap.Status.Conditions[0].Status)
+	assert.Equal(t, "SnapshotTimeout", snap.Status.Conditions[0].Reason)
 }

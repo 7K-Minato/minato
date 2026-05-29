@@ -108,28 +108,39 @@ func TestBuildStatefulSet(t *testing.T) {
 	assert.NotNil(t, sts2)
 }
 
-func TestBuildService(t *testing.T) {
+func TestBuildHeadlessService(t *testing.T) {
 	server := newTestGameServer()
 	profile := newTestProfile()
 	labels := buildGameServerLabels(server, profile)
 
-	svc := buildService(server, profile, labels)
+	svc := buildHeadlessService(server, labels)
 	require.NotNil(t, svc)
 	assert.Equal(t, "srv", svc.Name)
 	assert.Equal(t, "default", svc.Namespace)
 	assert.Equal(t, labels, svc.Labels)
 	assert.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+	assert.Equal(t, "None", svc.Spec.ClusterIP)
 	assert.Equal(t, labels, svc.Spec.Selector)
-	require.Len(t, svc.Spec.Ports, 2)
-	assert.Equal(t, "game", svc.Spec.Ports[0].Name)
-	assert.Equal(t, int32(25565), svc.Spec.Ports[0].Port)
-	assert.Equal(t, builder.AgentPortName, svc.Spec.Ports[1].Name)
-	assert.Equal(t, int32(builder.AgentGRPCPort), svc.Spec.Ports[1].Port)
+	assert.True(t, svc.Spec.PublishNotReadyAddresses)
+	require.Len(t, svc.Spec.Ports, 1)
+	assert.Equal(t, "placeholder", svc.Spec.Ports[0].Name)
+}
 
-	// Test default protocol
-	profile.Spec.Ports[0].Protocol = ""
-	svc2 := buildService(server, profile, labels)
-	assert.Equal(t, corev1.ProtocolTCP, svc2.Spec.Ports[0].Protocol)
+func TestBuildAgentService(t *testing.T) {
+	server := newTestGameServer()
+	profile := newTestProfile()
+	labels := buildGameServerLabels(server, profile)
+
+	svc := buildAgentService(server, labels)
+	require.NotNil(t, svc)
+	assert.Equal(t, "srv-agent", svc.Name)
+	assert.Equal(t, "default", svc.Namespace)
+	assert.Equal(t, labels, svc.Labels)
+	assert.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+	assert.Equal(t, labels, svc.Spec.Selector)
+	require.Len(t, svc.Spec.Ports, 1)
+	assert.Equal(t, builder.AgentPortName, svc.Spec.Ports[0].Name)
+	assert.Equal(t, int32(builder.AgentGRPCPort), svc.Spec.Ports[0].Port)
 }
 
 func TestBuildPVC(t *testing.T) {

@@ -55,13 +55,23 @@ func TestGameServerReconcileCreatesResources(t *testing.T) {
 		t.Fatalf("expected 2 containers, got %d", len(sts.Spec.Template.Spec.Containers))
 	}
 
-	svc := &corev1.Service{}
-	if err := k8sClient.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, svc); err != nil {
-		t.Fatalf("service not created: %v", err)
+	// Check headless service exists (for StatefulSet DNS)
+	headlessSvc := &corev1.Service{}
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, headlessSvc); err != nil {
+		t.Fatalf("headless service not created: %v", err)
+	}
+	if headlessSvc.Spec.ClusterIP != "None" {
+		t.Fatalf("expected headless service (ClusterIP=None), got %s", headlessSvc.Spec.ClusterIP)
+	}
+
+	// Check agent service exists (for control plane → agent communication)
+	agentSvc := &corev1.Service{}
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: server.Name + "-agent", Namespace: server.Namespace}, agentSvc); err != nil {
+		t.Fatalf("agent service not created: %v", err)
 	}
 
 	agentPortFound := false
-	for _, port := range svc.Spec.Ports {
+	for _, port := range agentSvc.Spec.Ports {
 		if port.Name == "agent" {
 			agentPortFound = true
 			if port.TargetPort.String() != "agent" {
@@ -70,7 +80,7 @@ func TestGameServerReconcileCreatesResources(t *testing.T) {
 		}
 	}
 	if !agentPortFound {
-		t.Fatalf("expected agent port on service")
+		t.Fatalf("expected agent port on agent service")
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{}

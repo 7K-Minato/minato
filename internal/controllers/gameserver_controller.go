@@ -116,7 +116,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	labelsMap := buildGameServerLabels(server, profile)
 
-	// Step 3: Reconcile StatefulSet, Service, PVC
+	// Step 3: Reconcile StatefulSet, Headless Service, Agent Service, PVC
 	sts := buildStatefulSet(server, podSpec, labelsMap)
 	if err := controllerutil.SetControllerReference(server, sts, r.Scheme); err != nil {
 		return ctrl.Result{}, err
@@ -125,11 +125,21 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	svc := buildService(server, profile, labelsMap)
-	if err := controllerutil.SetControllerReference(server, svc, r.Scheme); err != nil {
+	// Headless service for StatefulSet DNS stability (no load balancing)
+	headlessSvc := buildHeadlessService(server, labelsMap)
+	if err := controllerutil.SetControllerReference(server, headlessSvc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.Patch(ctx, svc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+	if err := r.Patch(ctx, headlessSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// ClusterIP service for agent gRPC (internal control plane communication only)
+	agentSvc := buildAgentService(server, labelsMap)
+	if err := controllerutil.SetControllerReference(server, agentSvc, r.Scheme); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, agentSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -235,8 +245,13 @@ func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *ope
 		return err
 	}
 
-	svc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name, Namespace: server.Namespace}}
-	if err := r.Delete(ctx, svc); err != nil && !apierrors.IsNotFound(err) {
+	headlessSvc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name, Namespace: server.Namespace}}
+	if err := r.Delete(ctx, headlessSvc); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	agentSvc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-agent", Namespace: server.Namespace}}
+	if err := r.Delete(ctx, agentSvc); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -249,8 +264,9 @@ func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *ope
 }
 
 // agentAddress returns the gRPC address for the game's agent sidecar.
+// Uses the dedicated agent service (server-name-agent) to avoid routing through the headless service.
 func agentAddress(server *operatorv1.GameServer) string {
-	return fmt.Sprintf("%s.%s.svc.cluster.local:%d", server.Name, server.Namespace, builder.AgentGRPCPort)
+	return fmt.Sprintf("%s-agent.%s.svc.cluster.local:%d", server.Name, server.Namespace, builder.AgentGRPCPort)
 }
 
 // dialAgent establishes a gRPC connection to the agent for the given GameServer.
@@ -460,31 +476,13 @@ func buildStatefulSet(
 	}
 }
 
-func buildService(
+// buildHeadlessService creates a headless Service for the StatefulSet.
+// This provides stable DNS names for pods (e.g., minecraft-0.minecraft-smp-1.minato.svc.cluster.local)
+// without any load balancing. Game traffic should NOT go through this service.
+func buildHeadlessService(
 	server *operatorv1.GameServer,
-	profile *operatorv1.GameProfile,
 	labelsMap map[string]string,
 ) *corev1.Service {
-	ports := make([]corev1.ServicePort, 0, len(profile.Spec.Ports)+1)
-	for _, port := range profile.Spec.Ports {
-		protocol := port.Protocol
-		if protocol == "" {
-			protocol = corev1.ProtocolTCP
-		}
-		ports = append(ports, corev1.ServicePort{
-			Name:       port.Name,
-			Port:       port.ContainerPort,
-			TargetPort: intstr.FromInt32(port.ContainerPort),
-			Protocol:   protocol,
-		})
-	}
-	ports = append(ports, corev1.ServicePort{
-		Name:       builder.AgentPortName,
-		Port:       builder.AgentGRPCPort,
-		TargetPort: intstr.FromString(builder.AgentPortName),
-		Protocol:   corev1.ProtocolTCP,
-	})
-
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -493,9 +491,47 @@ func buildService(
 			Labels:    labelsMap,
 		},
 		Spec: corev1.ServiceSpec{
+			Type:      corev1.ServiceTypeClusterIP,
+			ClusterIP: "None", // Headless — no virtual IP, DNS returns pod IPs directly
+			Selector:  labelsMap,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "placeholder",
+					Port:       1,
+					TargetPort: intstr.FromInt(1),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			PublishNotReadyAddresses: true, // Allow DNS resolution even before pod is ready
+		},
+	}
+}
+
+// buildAgentService creates a ClusterIP Service for the agent gRPC port.
+// This is used by the control plane to communicate with the agent sidecar.
+// It is NOT exposed to player traffic.
+func buildAgentService(
+	server *operatorv1.GameServer,
+	labelsMap map[string]string,
+) *corev1.Service {
+	return &corev1.Service{
+		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name + "-agent",
+			Namespace: server.Namespace,
+			Labels:    labelsMap,
+		},
+		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
 			Selector: labelsMap,
-			Ports:    ports,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       builder.AgentPortName,
+					Port:       builder.AgentGRPCPort,
+					TargetPort: intstr.FromString(builder.AgentPortName),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
 		},
 	}
 }
@@ -506,7 +542,14 @@ func buildPVC(server *operatorv1.GameServer, profile *operatorv1.GameProfile) *c
 		quantity = resource.MustParse("1Gi")
 	}
 
-	return &corev1.PersistentVolumeClaim{
+	// Use user-provided size if specified
+	if server.Spec.Storage.Size != "" {
+		if q, err := resource.ParseQuantity(server.Spec.Storage.Size); err == nil {
+			quantity = q
+		}
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "PersistentVolumeClaim"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name,
@@ -521,6 +564,37 @@ func buildPVC(server *operatorv1.GameServer, profile *operatorv1.GameProfile) *c
 			},
 		},
 	}
+
+	if server.Spec.Storage.StorageClass != "" {
+		pvc.Spec.StorageClassName = &server.Spec.Storage.StorageClass
+	}
+
+	// Restore from snapshot if specified
+	if server.Spec.Storage.SnapshotRef != nil {
+		snapNamespace := server.Spec.Storage.SnapshotRef.Namespace
+		if snapNamespace == "" {
+			snapNamespace = server.Namespace
+		}
+		pvc.Spec.DataSource = &corev1.TypedLocalObjectReference{
+			APIGroup: strPtr("snapshot.storage.k8s.io"),
+			Kind:     "VolumeSnapshot",
+			Name:     server.Spec.Storage.SnapshotRef.Name,
+		}
+		// Add annotation for cross-namespace snapshot references
+		// Some CSI drivers require this
+		if snapNamespace != server.Namespace {
+			if pvc.Annotations == nil {
+				pvc.Annotations = make(map[string]string)
+			}
+			pvc.Annotations["minato.io/snapshot-namespace"] = snapNamespace
+		}
+	}
+
+	return pvc
+}
+
+func strPtr(s string) *string {
+	return &s
 }
 
 func buildGameServerLabels(server *operatorv1.GameServer, profile *operatorv1.GameProfile) map[string]string {

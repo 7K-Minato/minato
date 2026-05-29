@@ -1,0 +1,123 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    ":disableDependencyDashboard"
+  ],
+  "labels": ["dependencies"],
+  "timezone": "UTC",
+  "schedule": [
+    "before 9am on monday"
+  ],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "gomod": {
+    "enabled": true,
+    "postUpdateOptions": ["gomodTidy"]
+  },
+  "github-actions": {
+    "enabled": true,
+    "pinDigests": true
+  },
+  "dockerfile": {
+    "enabled": true
+  },
+  "helmv3": {
+    "enabled": true
+  },
+  "regexManagers": [
+    {
+      "fileMatch": ["^.github/workflows/reusable-.*\\.yml$"],
+      "matchStrings": [
+        "uses: (?<depName>[^@]+)@(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group all GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "groupSlug": "github-actions"
+    },
+    {
+      "description": "Group all Go module updates",
+      "matchManagers": ["gomod"],
+      "groupName": "go-modules",
+      "groupSlug": "go-modules"
+    },
+    {
+      "description": "Group all Dockerfile updates",
+      "matchManagers": ["dockerfile"],
+      "groupName": "docker-images",
+      "groupSlug": "docker-images"
+    },
+    {
+      "description": "Group all Helm chart updates",
+      "matchManagers": ["helmv3"],
+      "groupName": "helm-charts",
+      "groupSlug": "helm-charts"
+    },
+    {
+      "description": "Auto-merge patch updates for Go modules",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Auto-merge patch updates for GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Auto-merge digest updates for GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Require approval for major updates",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Kubernetes ecosystem packages",
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/**"
+      ],
+      "groupName": "kubernetes-ecosystem",
+      "schedule": ["before 9am on monday"]
+    },
+    {
+      "description": "Controller-runtime updates (careful with compatibility)",
+      "matchPackageNames": ["sigs.k8s.io/controller-runtime"],
+      "matchUpdateTypes": ["major", "minor"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Buf/protobuf tooling",
+      "matchPackageNames": [
+        "github.com/bufbuild/**",
+        "google.golang.org/protobuf",
+        "google.golang.org/grpc"
+      ],
+      "groupName": "protobuf-tooling"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "automerge": true
+  }
+}

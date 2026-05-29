@@ -22,6 +22,7 @@ import (
 
 	operatorv1 "github.com/7k-group/minato/api/operator/v1"
 	"github.com/7k-group/minato/internal/controllers"
+	minatowebhook "github.com/7k-group/minato/internal/webhook"
 )
 
 var (
@@ -183,12 +184,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: implement and register webhook validators once webhook types are available.
-	// Example wiring (commented out until validators are implemented):
-	// if err := (&operatorv1.GameServer{}).SetupWebhookWithManager(mgr); err != nil {
-	//     setupLog.Error(err, "unable to create webhook", "webhook", "GameServer")
-	//     os.Exit(1)
-	// }
+	gsnap := &controllers.GameSnapshotReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	if err := gsnap.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "GameSnapshot")
+		os.Exit(1)
+	}
+
+	// Register webhook validators
+	if err := (&minatowebhook.GameServerValidator{Client: mgr.GetClient()}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "GameServer")
+		os.Exit(1)
+	}
+	if err := (&minatowebhook.GameProfileValidator{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "GameProfile")
+		os.Exit(1)
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up health check")

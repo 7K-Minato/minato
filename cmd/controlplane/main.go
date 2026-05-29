@@ -19,6 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	"github.com/7k-group/minato/internal/controlplane/audit"
+	"github.com/7k-group/minato/internal/controlplane/auth"
+	"github.com/7k-group/minato/internal/controlplane/rbac"
 )
 
 func main() {
@@ -28,16 +31,29 @@ func main() {
 		log.Fatalf("failed to create k8s client: %v", err)
 	}
 
+	// Load auth configuration
+	authCfg := auth.LoadConfig()
+
+	// API key storage (namespace where control plane runs)
+	keyStorage := auth.NewAPIKeyStorage(c, os.Getenv("POD_NAMESPACE"))
+
+	authChain, err := auth.BuildChainWithStorage(authCfg, keyStorage)
+	if err != nil {
+		log.Fatalf("failed to build auth chain: %v", err)
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(securityHeadersMiddleware)
 	r.Use(middleware.RequestSize(10 * 1024 * 1024)) // 10MB max request size
+	r.Use(audit.Middleware())
+	r.Use(auth.Middleware(authChain))
 
-	api := &controlPlaneAPI{client: c}
+	api := &controlPlaneAPI{client: c, authCfg: authCfg, keyStorage: keyStorage}
 
-	// Health endpoints
+	// Health endpoints (always public)
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -49,31 +65,47 @@ func main() {
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// GameServers
+		// GameServers - viewer+ can read
 		r.Get("/gameservers", api.listGameServers)
 		r.Get("/gameservers/{namespace}/{name}", api.getGameServer)
-		r.Post("/gameservers/{namespace}", api.createGameServer)
-		r.Delete("/gameservers/{namespace}/{name}", api.deleteGameServer)
 
-		// Actions
+		// GameServers - admin only for write
+		r.With(rbac.RequireRole("admin")).
+			Post("/gameservers/{namespace}", api.createGameServer)
+		r.With(rbac.RequireRole("admin")).
+			Delete("/gameservers/{namespace}/{name}", api.deleteGameServer)
+
+		// Actions - viewer can list, operator+ can execute
 		r.Get("/gameservers/{namespace}/{name}/actions", api.listActions)
-		r.Post("/gameservers/{namespace}/{name}/actions/{action}", api.executeAction)
+		r.With(rbac.RequireRole("operator", "admin")).
+			Post("/gameservers/{namespace}/{name}/actions/{action}", api.executeAction)
 		r.Get("/gameservers/{namespace}/{name}/actions/{executionId}", api.getActionExecution)
 
-		// Snapshots
+		// Snapshots - viewer can list, operator+ can create
 		r.Get("/gameservers/{namespace}/{name}/snapshots", api.listSnapshots)
-		r.Post("/gameservers/{namespace}/{name}/snapshots", api.createSnapshot)
+		r.With(rbac.RequireRole("operator", "admin")).
+			Post("/gameservers/{namespace}/{name}/snapshots", api.createSnapshot)
 
-		// Console (WebSocket)
-		r.Get("/gameservers/{namespace}/{name}/console", api.handleConsole)
+		// Console (WebSocket) - operator+
+		// TODO: Implement WebSocket proxy to agent gRPC console stream
+		// r.With(rbac.RequireRole("operator", "admin")).
+		// 	Get("/gameservers/{namespace}/{name}/console", api.handleConsole)
 
-		// Fleets
+		// Fleets - viewer+ can read, admin can write
 		r.Get("/gameserverfleets", api.listGameServerFleets)
 		r.Get("/gameserverfleets/{namespace}/{name}", api.getGameServerFleet)
 
-		// Profiles
+		// Profiles - viewer+ can read
 		r.Get("/profiles", api.listProfiles)
 		r.Get("/profiles/{name}", api.getProfile)
+
+		// API Keys - admin only
+		r.With(rbac.RequireRole("admin")).
+			Get("/apikeys", api.listAPIKeys)
+		r.With(rbac.RequireRole("admin")).
+			Post("/apikeys", api.createAPIKey)
+		r.With(rbac.RequireRole("admin")).
+			Delete("/apikeys/{keyId}", api.deleteAPIKey)
 	})
 
 	port := os.Getenv("PORT")
@@ -107,7 +139,9 @@ func main() {
 }
 
 type controlPlaneAPI struct {
-	client client.Client
+	client     client.Client
+	authCfg    *auth.Config
+	keyStorage *auth.APIKeyStorage
 }
 
 func (api *controlPlaneAPI) listGameServers(w http.ResponseWriter, r *http.Request) {
@@ -190,6 +224,15 @@ func (api *controlPlaneAPI) executeAction(w http.ResponseWriter, r *http.Request
 		params = map[string]string{}
 	}
 
+	user := auth.GetUser(r.Context())
+	caller := r.Header.Get("X-User")
+	if caller == "" {
+		caller = "anonymous"
+	}
+	if user != nil && user.Source != "none" {
+		caller = user.Username
+	}
+
 	exec := &operatorv1.ActionExecution{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s-%d", name, actionName, time.Now().Unix()),
@@ -204,7 +247,7 @@ func (api *controlPlaneAPI) executeAction(w http.ResponseWriter, r *http.Request
 			},
 			ActionName: actionName,
 			Params:     params,
-			Caller:     r.Header.Get("X-User"),
+			Caller:     caller,
 		},
 	}
 
@@ -317,6 +360,72 @@ func (api *controlPlaneAPI) getProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, profile)
+}
+
+// API Key management endpoints
+
+func (api *controlPlaneAPI) listAPIKeys(w http.ResponseWriter, r *http.Request) {
+	keys, err := api.keyStorage.ListKeys(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, keys)
+}
+
+func (api *controlPlaneAPI) createAPIKey(w http.ResponseWriter, r *http.Request) {
+	// Only authenticated users can generate API keys
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+		Role string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Default role to the user's role if not specified
+	role := req.Role
+	if role == "" {
+		role = user.Role
+	}
+
+	// Generate the key
+	entry, keyValue, err := api.keyStorage.GenerateKey(r.Context(), req.Name, user.ID, user.Username, role)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return the key value ONCE - it will never be shown again
+	respondJSON(w, map[string]interface{}{
+		"name":      entry.Name,
+		"role":      entry.Role,
+		"createdAt": entry.CreatedAt,
+		"key":       keyValue, // One-time display
+		"warning":   "This key will never be shown again. Store it securely.",
+	})
+}
+
+func (api *controlPlaneAPI) deleteAPIKey(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "keyId")
+	if err := api.keyStorage.DeleteKey(r.Context(), name); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func respondJSON(w http.ResponseWriter, data any) {

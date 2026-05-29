@@ -1,0 +1,11 @@
+apiVersion: operator.minato.io/v1
+kind: GameSnapshot
+metadata:
+  name: daily-backup
+  namespace: default
+spec:
+  gameServerRef: minecraft-server-1
+  schedule: "0 2 * * *"
+  retention:
+    count: 7
+    duration: "168h"
