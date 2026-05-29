@@ -6,9 +6,6 @@ on:
       - opened
       - synchronize
       - reopened
-    branches:
-      - main
-      - 'release/**'
 
 permissions:
   contents: read
