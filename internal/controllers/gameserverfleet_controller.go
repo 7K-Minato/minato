@@ -296,8 +296,10 @@ func (r *GameServerFleetReconciler) buildGameServer(
 			Annotations: annotations,
 		},
 		Spec: operatorv1.GameServerSpec{
-			Profile: fleet.Spec.Profile,
-			Env:     fleet.Spec.Template.Spec.Env,
+			Profile:                   fleet.Spec.Profile,
+			Env:                       fleet.Spec.Template.Spec.Env,
+			PriorityClassName:         fleet.Spec.PriorityClassName,
+			TopologySpreadConstraints: fleet.Spec.TopologySpreadConstraints,
 		},
 	}
 }

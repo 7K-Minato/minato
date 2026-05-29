@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -75,6 +76,20 @@ type GameServerSpec struct {
 	// lifecycle defines lifecycle settings.
 	// +optional
 	Lifecycle LifecycleSpec `json:"lifecycle,omitempty"`
+
+	// priorityClassName specifies the PriorityClass for the game server pod.
+	// Higher priority pods are less likely to be evicted under resource pressure.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// topologySpreadConstraints control how pods are spread across topology domains
+	// (zones, nodes) for high availability.
+	// +optional
+	// +patchMergeKey=topologyKey
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=topologyKey
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
 // Endpoint defines a network endpoint for a GameServer.

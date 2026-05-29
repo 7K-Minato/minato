@@ -57,9 +57,19 @@ func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.
 		VolumeMounts: buildDataVolumeMounts(profile),
 	}
 
-	return corev1.PodSpec{
+	podSpec := corev1.PodSpec{
 		Containers: []corev1.Container{gameContainer, agentContainer},
-	}, nil
+	}
+
+	if server.Spec.PriorityClassName != "" {
+		podSpec.PriorityClassName = server.Spec.PriorityClassName
+	}
+
+	if len(server.Spec.TopologySpreadConstraints) > 0 {
+		podSpec.TopologySpreadConstraints = server.Spec.TopologySpreadConstraints
+	}
+
+	return podSpec, nil
 }
 
 func buildGameEnv(profile *operatorv1.GameProfile, server *operatorv1.GameServer) []corev1.EnvVar {

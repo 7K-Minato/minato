@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -93,6 +94,21 @@ type GameServerFleetSpec struct {
 	// updateStrategy controls how updates are rolled out.
 	// +optional
 	UpdateStrategy FleetUpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// priorityClassName specifies the PriorityClass for all game server pods in this fleet.
+	// Higher priority pods are less likely to be evicted under resource pressure.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// topologySpreadConstraints control how pods are spread across topology domains
+	// (zones, nodes) for high availability. Each constraint is applied to pods
+	// created by this fleet.
+	// +optional
+	// +patchMergeKey=topologyKey
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=topologyKey
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
 // GameServerFleetStatus defines the observed state of GameServerFleet.
