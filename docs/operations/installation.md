@@ -128,8 +128,12 @@ kubectl get crds | grep minato
 
 ### Create a Test GameServer
 
+Game profiles are maintained in the [minato-games](https://github.com/7k-group/minato-games) repository.
+
 ```bash
-# Apply Minecraft profile
+# Clone the games repository and apply a profile
+git clone https://github.com/7k-group/minato-games.git
+cd minato-games
 kubectl apply -f profiles/minecraft-paper/profile.yaml
 
 # Create a GameServer
