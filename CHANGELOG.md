@@ -75,5 +75,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Helm chart for deployment
 - Basic documentation
 
-[Unreleased]: https://github.com/7k-group/minato/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/7k-group/minato/releases/tag/v0.1.0
+[Unreleased]: https://github.com/7k-minato/minato/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/7k-minato/minato/releases/tag/v0.1.0

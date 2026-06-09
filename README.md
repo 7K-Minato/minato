@@ -1,8 +1,8 @@
 # Minato (南)
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/7k-group/minato/ci.yml?branch=main)](https://github.com/7k-group/minato/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/7k-group/minato)](https://goreportcard.com/report/github.com/7k-group/minato)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](https://github.com/7k-group/minato)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/7k-minato/minato/ci.yml?branch=main)](https://github.com/7k-minato/minato/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/7k-minato/minato)](https://goreportcard.com/report/github.com/7k-minato/minato)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](https://github.com/7k-minato/minato)
 [![Go Version](https://img.shields.io/badge/go-1.23-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -52,7 +52,7 @@ The operator reconciles CRDs into Kubernetes resources (StatefulSets, PVCs, Serv
 ### Install with Helm
 
 ```bash
-helm repo add minato https://7k-group.github.io/minato
+helm repo add minato https://7k-minato.github.io/minato
 helm repo update
 helm install minato minato/minato \
   --namespace minato-system \
@@ -62,7 +62,7 @@ helm install minato minato/minato \
 ### Install from Source
 
 ```bash
-git clone https://github.com/7k-group/minato.git
+git clone https://github.com/7k-minato/minato.git
 cd minato
 make install
 make deploy
@@ -70,11 +70,11 @@ make deploy
 
 ### Create a Minecraft Server
 
-Game profiles are maintained in the [minato-games](https://github.com/7k-group/minato-games) repository.
+Game profiles are maintained in the [minato-games](https://github.com/7k-minato/minato-games) repository.
 
 ```bash
 # Clone the games repository and apply the Minecraft Paper profile
-git clone https://github.com/7k-group/minato-games.git
+git clone https://github.com/7k-minato/minato-games.git
 cd minato-games
 kubectl apply -f profiles/minecraft-paper/profile.yaml
 

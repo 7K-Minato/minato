@@ -13,8 +13,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	agentv1 "github.com/7k-minato/minato/api/agent/v1/minato/agent/v1"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
 
 const defaultAgentGRPCPort = 9876

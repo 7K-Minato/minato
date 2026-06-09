@@ -252,7 +252,7 @@ minato/
 └── Makefile
 ```
 
-> **Note:** All agents (game-specific and generic) and curated GameProfile YAMLs live in the separate [`minato-games`](https://github.com/7k-group/minato-games) repository. This repository contains only the game-agnostic operator, control plane, and SDK.
+> **Note:** All agents (game-specific and generic) and curated GameProfile YAMLs live in the separate [`minato-games`](https://github.com/7k-minato/minato-games) repository. This repository contains only the game-agnostic operator, control plane, and SDK.
 
 ## Working agreement
 

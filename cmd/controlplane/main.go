@@ -19,10 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
-	"github.com/7k-group/minato/internal/controlplane/audit"
-	"github.com/7k-group/minato/internal/controlplane/auth"
-	"github.com/7k-group/minato/internal/controlplane/rbac"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/internal/controlplane/audit"
+	"github.com/7k-minato/minato/internal/controlplane/auth"
+	"github.com/7k-minato/minato/internal/controlplane/rbac"
 )
 
 func main() {
@@ -456,16 +456,16 @@ func (api *controlPlaneAPI) getAuthConfig(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	config := map[string]any{
+	responseConfig := map[string]any{
 		"authModes":    modes,
 		"basicEnabled": api.authCfg.Basic.Enabled,
 	}
 
 	if api.authCfg.OIDC.Enabled && api.authCfg.OIDC.IssuerURL != "" {
-		config["oidcIssuer"] = api.authCfg.OIDC.IssuerURL
+		responseConfig["oidcIssuer"] = api.authCfg.OIDC.IssuerURL
 	}
 
-	respondJSON(w, config)
+	respondJSON(w, responseConfig)
 }
 
 func respondJSON(w http.ResponseWriter, data any) {

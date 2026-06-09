@@ -9,7 +9,7 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -ldflags='-s -w' -o controlplane ./cmd/controlplane
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -ldflags='-s -w' -o controlplane ./cmd/controlplane
 
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /

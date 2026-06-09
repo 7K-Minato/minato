@@ -1,4 +1,4 @@
-module github.com/7k-group/minato
+module github.com/7k-minato/minato
 
 go 1.26.4
 
