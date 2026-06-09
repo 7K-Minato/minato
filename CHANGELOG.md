@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/7K-Minato/minato/compare/v1.1.0...v1.1.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* update mod name to 7k-minato ([#12](https://github.com/7K-Minato/minato/issues/12)) ([58cfe08](https://github.com/7K-Minato/minato/commit/58cfe08b4f1e33b6050a0cc92ea635e4b8bca53c))
+
 ## [1.1.0](https://github.com/7K-Minato/minato/compare/v1.0.0...v1.1.0) (2026-06-09)
 
 
