@@ -247,7 +247,9 @@ jobs:
           CHART_NAME: ${{ steps.package.outputs.name }}
           PACKAGE: ${{ steps.package.outputs.package }}
         run: |
-          REF="oci://${HARBOR_REGISTRY}/${HARBOR_PROJECT}/charts"
+          REGISTRY_HOST="${HARBOR_REGISTRY#https://}"
+          REGISTRY_HOST="${REGISTRY_HOST#http://}"
+          REF="oci://${REGISTRY_HOST}/${HARBOR_PROJECT}/charts"
           if ! OUTPUT=$(helm push "$PACKAGE" "$REF" 2>&1); then
             echo "$OUTPUT"
             exit 1
@@ -259,7 +261,7 @@ jobs:
             exit 1
           fi
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "ref=${HARBOR_REGISTRY}/${HARBOR_PROJECT}/charts/${CHART_NAME}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REGISTRY_HOST}/${HARBOR_PROJECT}/charts/${CHART_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Sign chart with cosign (keyless)
         run: cosign sign --yes "${{ steps.push.outputs.ref }}@${{ steps.push.outputs.digest }}"
