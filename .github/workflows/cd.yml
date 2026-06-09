@@ -133,13 +133,23 @@ jobs:
           username: ${{ secrets.HARBOR_ROBOT_NAME }}
           password: ${{ secrets.HARBOR_ROBOT_TOKEN }}
 
+      - name: Set image name
+        id: image
+        run: |
+          REGISTRY="${HARBOR_REGISTRY#https://}"
+          REGISTRY="${REGISTRY#http://}"
+          IMAGE="${REGISTRY}/${HARBOR_PROJECT}/${{ matrix.image-name }}"
+          echo "name=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+        env:
+          HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+          HARBOR_PROJECT: ${{ secrets.HARBOR_PROJECT }}
+
       - name: Extract metadata
         id: meta
-        env:
-          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
         uses: docker/metadata-action@v6.0.0
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=semver,pattern={{version}},value=${{ needs.release-please.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.version }}
@@ -164,13 +174,13 @@ jobs:
       - name: Sign image with cosign (keyless)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
+          IMAGE: ${{ steps.image.outputs.name }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
       - name: Verify signature
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
+          IMAGE: ${{ steps.image.outputs.name }}
         run: |
           cosign verify \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
@@ -180,14 +190,14 @@ jobs:
       - name: Generate SBOM
         uses: anchore/sbom-action@v0.18.0
         with:
-          image: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}@${{ steps.build.outputs.digest }}
+          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           output-file: sbom.spdx.json
 
       - name: Attest SBOM to image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
+          IMAGE: ${{ steps.image.outputs.name }}
         run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${IMAGE}@${DIGEST}"
 
   # Build and publish Helm chart to Harbor OCI
