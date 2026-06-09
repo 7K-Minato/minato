@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -62,6 +63,9 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+
+	// Auth configuration endpoint (always public, used by UI for discovery)
+	r.Get("/auth/config", api.getAuthConfig)
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
@@ -426,6 +430,42 @@ func (api *controlPlaneAPI) deleteAPIKey(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (api *controlPlaneAPI) getAuthConfig(w http.ResponseWriter, r *http.Request) {
+	// Parse auth modes from config
+	modes := []string{}
+	for mode := range strings.SplitSeq(api.authCfg.Mode, ",") {
+		mode = strings.TrimSpace(strings.ToLower(mode))
+		if mode != "" {
+			modes = append(modes, mode)
+		}
+	}
+
+	// If no explicit modes, infer from enabled providers
+	if len(modes) == 0 || (len(modes) == 1 && modes[0] == "none") {
+		modes = []string{"none"}
+		if api.authCfg.Basic.Enabled {
+			modes = append(modes, "basic")
+		}
+		if api.authCfg.OIDC.Enabled {
+			modes = append(modes, "oidc")
+		}
+		if api.authCfg.APIKey.Enabled {
+			modes = append(modes, "apikey")
+		}
+	}
+
+	config := map[string]any{
+		"authModes":    modes,
+		"basicEnabled": api.authCfg.Basic.Enabled,
+	}
+
+	if api.authCfg.OIDC.Enabled && api.authCfg.OIDC.IssuerURL != "" {
+		config["oidcIssuer"] = api.authCfg.OIDC.IssuerURL
+	}
+
+	respondJSON(w, config)
 }
 
 func respondJSON(w http.ResponseWriter, data any) {

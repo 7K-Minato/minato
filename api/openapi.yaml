@@ -1,0 +1,994 @@
+openapi: 3.1.0
+info:
+  title: Minato Control Plane API
+  description: |
+    REST API for managing game servers, fleets, profiles, and snapshots.
+    All endpoints under `/api/v1` require authentication except where noted.
+  version: 1.0.0
+  contact:
+    name: 7K Group
+    url: https://7kgroup.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+  - basicAuth: []
+  - apiKeyAuth: []
+
+tags:
+  - name: Health
+    description: Public health checks
+  - name: Auth
+    description: Authentication discovery
+  - name: GameServers
+    description: Game server lifecycle management
+  - name: Actions
+    description: Game server action execution
+  - name: Snapshots
+    description: Game server snapshot management
+  - name: Fleets
+    description: Game server fleet management
+  - name: Profiles
+    description: Game profile management
+  - name: API Keys
+    description: API key management
+
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Returns 200 OK if the control plane is running
+      security: []
+      responses:
+        "200":
+          description: Control plane is alive
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Returns 200 OK if the control plane is ready to serve requests
+      security: []
+      responses:
+        "200":
+          description: Control plane is ready
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+  /auth/config:
+    get:
+      tags: [Auth]
+      summary: Auth configuration discovery
+      description: |
+        Returns the available authentication modes and configuration.
+        This endpoint is public and used by the UI to auto-configure auth.
+      security: []
+      responses:
+        "200":
+          description: Auth configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthConfig"
+
+  /api/v1/gameservers:
+    get:
+      tags: [GameServers]
+      summary: List game servers
+      description: List all GameServers across all namespaces
+      responses:
+        "200":
+          description: List of game servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameServer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/gameservers/{namespace}:
+    post:
+      tags: [GameServers]
+      summary: Create game server
+      description: Create a new GameServer in the specified namespace (admin only)
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameServer"
+      responses:
+        "201":
+          description: Game server created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/gameservers/{namespace}/{name}:
+    get:
+      tags: [GameServers]
+      summary: Get game server
+      description: Get a specific GameServer by namespace and name
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Game server details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServer"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [GameServers]
+      summary: Delete game server
+      description: Delete a GameServer (admin only)
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Game server deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/gameservers/{namespace}/{name}/actions:
+    get:
+      tags: [Actions]
+      summary: List available actions
+      description: List actions available for a game server based on its profile
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of available actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Action"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/gameservers/{namespace}/{name}/actions/{action}:
+    post:
+      tags: [Actions]
+      summary: Execute action
+      description: Execute an action on a game server (operator+ only)
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+              example:
+                message: "Hello players!"
+      responses:
+        "201":
+          description: Action execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Execution ID
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/gameservers/{namespace}/{name}/actions/{executionId}:
+    get:
+      tags: [Actions]
+      summary: Get action execution status
+      description: Get the status of an action execution
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Action execution details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionExecution"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/gameservers/{namespace}/{name}/snapshots:
+    get:
+      tags: [Snapshots]
+      summary: List snapshots
+      description: List snapshots for a game server
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameSnapshot"
+    post:
+      tags: [Snapshots]
+      summary: Create snapshot
+      description: Create a snapshot for a game server (operator+ only)
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Snapshot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/gameserverfleets:
+    get:
+      tags: [Fleets]
+      summary: List fleets
+      description: List all GameServerFleets across all namespaces
+      responses:
+        "200":
+          description: List of fleets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameServerFleet"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/gameserverfleets/{namespace}/{name}:
+    get:
+      tags: [Fleets]
+      summary: Get fleet
+      description: Get a specific GameServerFleet
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fleet details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServerFleet"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/profiles:
+    get:
+      tags: [Profiles]
+      summary: List profiles
+      description: List all GameProfiles (cluster-scoped)
+      responses:
+        "200":
+          description: List of game profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/profiles/{name}:
+    get:
+      tags: [Profiles]
+      summary: Get profile
+      description: Get a specific GameProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Profile details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameProfile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/apikeys:
+    get:
+      tags: [API Keys]
+      summary: List API keys
+      description: List all API keys without secret values (admin only)
+      responses:
+        "200":
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/APIKey"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [API Keys]
+      summary: Create API key
+      description: Generate a new API key (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Key name
+                role:
+                  type: string
+                  enum: [viewer, operator, admin]
+                  description: Role for the key
+      responses:
+        "201":
+          description: API key created (key value shown once)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  role:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+                  key:
+                    type: string
+                    description: The API key value (shown once)
+                  warning:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/apikeys/{keyId}:
+    delete:
+      tags: [API Keys]
+      summary: Revoke API key
+      description: Delete/revoke an API key (admin only)
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: API key revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: OIDC JWT token
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Basic authentication
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key authentication
+
+  schemas:
+    AuthConfig:
+      type: object
+      properties:
+        authModes:
+          type: array
+          items:
+            type: string
+            enum: [none, basic, oidc, apikey]
+          description: Available authentication modes
+        oidcIssuer:
+          type: string
+          format: uri
+          nullable: true
+          description: OIDC issuer URL (if OIDC is enabled)
+        basicEnabled:
+          type: boolean
+          description: Whether Basic auth is enabled
+      required: [authModes, basicEnabled]
+      example:
+        authModes: [basic, oidc, apikey]
+        oidcIssuer: https://auth.7kgroup.com/realms/minato
+        basicEnabled: true
+
+    GameServer:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+          example: operator.minato.io/v1
+        kind:
+          type: string
+          example: GameServer
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          $ref: "#/components/schemas/GameServerSpec"
+        status:
+          $ref: "#/components/schemas/GameServerStatus"
+
+    GameServerSpec:
+      type: object
+      properties:
+        profile:
+          type: string
+          description: Reference to GameProfile name
+        env:
+          type: object
+          additionalProperties:
+            type: string
+          description: Environment variables
+        storage:
+          $ref: "#/components/schemas/StorageSpec"
+        priorityClassName:
+          type: string
+        lifecycle:
+          type: object
+          properties:
+            idleTimeoutSeconds:
+              type: integer
+
+    GameServerStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [Provisioning, Running, Idle, Stopped, Error]
+        players:
+          type: integer
+          description: Current player count
+        playerCapacity:
+          type: integer
+          description: Maximum player capacity
+        agentVersion:
+          type: string
+        endpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Endpoint"
+        conditions:
+          type: array
+          items:
+            type: object
+
+    Endpoint:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        port:
+          type: integer
+
+    StorageSpec:
+      type: object
+      properties:
+        size:
+          type: string
+          example: 20Gi
+        storageClass:
+          type: string
+        snapshotRef:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+
+    Action:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        concurrency:
+          type: string
+          enum: [serialize, exclusive, allow]
+          default: allow
+        timeout:
+          type: string
+          example: 5m
+        params:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ActionParam"
+
+    ActionParam:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [string, number, boolean]
+        required:
+          type: boolean
+        default:
+          type: string
+
+    ActionExecution:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+          example: ActionExecution
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          type: object
+          properties:
+            targetRef:
+              type: object
+              properties:
+                apiVersion:
+                  type: string
+                kind:
+                  type: string
+                name:
+                  type: string
+                namespace:
+                  type: string
+            actionName:
+              type: string
+            params:
+              type: object
+              additionalProperties:
+                type: string
+            caller:
+              type: string
+        status:
+          type: object
+          properties:
+            state:
+              type: string
+              enum: [Pending, Running, Succeeded, Failed, Rejected]
+            startedAt:
+              type: string
+              format: date-time
+            completedAt:
+              type: string
+              format: date-time
+            result:
+              type: string
+            error:
+              type: string
+
+    GameSnapshot:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+          example: GameSnapshot
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          type: object
+          properties:
+            gameServerRef:
+              type: string
+            schedule:
+              type: string
+              description: Cron expression for scheduled snapshots
+            retention:
+              type: object
+              properties:
+                count:
+                  type: integer
+                duration:
+                  type: string
+                  example: 720h
+        status:
+          type: object
+          properties:
+            state:
+              type: string
+              enum: [Pending, Ready, Failed]
+            readyAt:
+              type: string
+              format: date-time
+            size:
+              type: string
+
+    GameServerFleet:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+          example: GameServerFleet
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          type: object
+          properties:
+            profile:
+              type: string
+            replicas:
+              type: integer
+            template:
+              type: object
+              properties:
+                spec:
+                  $ref: "#/components/schemas/GameServerSpec"
+            updateStrategy:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [RollingUpdate, Recreate]
+                rollingUpdate:
+                  type: object
+                  properties:
+                    maxUnavailable:
+                      type: integer
+            priorityClassName:
+              type: string
+            topologySpreadConstraints:
+              type: array
+              items:
+                type: object
+        status:
+          type: object
+          properties:
+            replicas:
+              type: integer
+            readyReplicas:
+              type: integer
+            updatedReplicas:
+              type: integer
+            availableReplicas:
+              type: integer
+            conditions:
+              type: array
+              items:
+                type: object
+
+    GameProfile:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+          example: GameProfile
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+        spec:
+          $ref: "#/components/schemas/GameProfileSpec"
+
+    GameProfileSpec:
+      type: object
+      properties:
+        displayName:
+          type: string
+        image:
+          type: string
+          description: Game server container image
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/Port"
+        environment:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvVar"
+        resources:
+          type: object
+          properties:
+            requests:
+              type: object
+              properties:
+                cpu:
+                  type: string
+                memory:
+                  type: string
+            limits:
+              type: object
+              properties:
+                cpu:
+                  type: string
+                memory:
+                  type: string
+        storage:
+          type: object
+          properties:
+            mountPath:
+              type: string
+            sizeDefault:
+              type: string
+          required: [mountPath]
+        agent:
+          type: object
+          properties:
+            image:
+              type: string
+            version:
+              type: string
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Action"
+        capabilities:
+          type: object
+          properties:
+            files:
+              type: boolean
+            sftp:
+              type: boolean
+            backup:
+              type: boolean
+            restoreFromSnapshot:
+              type: boolean
+
+    Port:
+      type: object
+      properties:
+        name:
+          type: string
+        containerPort:
+          type: integer
+        protocol:
+          type: string
+          enum: [TCP, UDP]
+          default: TCP
+
+    EnvVar:
+      type: object
+      properties:
+        key:
+          type: string
+        default:
+          type: string
+        required:
+          type: boolean
+
+    APIKey:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [viewer, operator, admin]
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
