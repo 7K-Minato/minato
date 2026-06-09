@@ -113,11 +113,10 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build operator, control plane, CLI, and generic agent.
+build: manifests generate fmt vet ## Build operator, control plane, and CLI.
 	go build -o bin/operator ./cmd/operator
 	go build -o bin/controlplane ./cmd/controlplane
 	go build -o bin/minato-ctl ./cmd/minato-ctl
-	go build -o bin/agent-generic ./cmd/agents/generic
 
 .PHONY: build-all
 build-all: ## Build all binaries for current platform.
@@ -125,7 +124,6 @@ build-all: ## Build all binaries for current platform.
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/operator ./cmd/operator
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/controlplane ./cmd/controlplane
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/minato-ctl ./cmd/minato-ctl
-	CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/agent-generic ./cmd/agents/generic
 
 .PHONY: docker-build-all
 docker-build-all: ## Build all Docker images.

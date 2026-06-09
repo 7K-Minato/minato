@@ -53,7 +53,6 @@ jobs:
         run: |
           docker build -t minato:operator -f Dockerfile .
           docker build -t minato:controlplane -f Dockerfile.controlplane .
-          docker build -t minato:agent-generic -f Dockerfile.agent-generic .
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master

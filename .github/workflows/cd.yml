@@ -74,7 +74,7 @@ jobs:
                 EXT=".exe"
               fi
               
-              for binary in operator controlplane minato-ctl agent-generic; do
+              for binary in operator controlplane minato-ctl; do
                 echo "Building minato-${binary} for ${os}/${arch}..."
                 GOOS=$os GOARCH=$arch CGO_ENABLED=0 \
                   go build -ldflags="-s -w -X main.version=${VERSION}" \
@@ -112,9 +112,6 @@ jobs:
           - component: controlplane
             dockerfile: Dockerfile.controlplane
             image-name: minato-controlplane
-          - component: agent-generic
-            dockerfile: Dockerfile.agent-generic
-            image-name: minato-agent-generic
     env:
       IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
     steps:
