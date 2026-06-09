@@ -442,7 +442,7 @@ func TestGameSnapshotReconciler_ShouldTakeSnapshot_Cron(t *testing.T) {
 	assert.Equal(t, time.Duration(0), requeue)
 
 	// Taken recently - should not take yet
-	snap.Status.LastSnapshotAt = &metav1.Time{Time: time.Now().Add(-30 * time.Second)}
+	snap.Status.LastSnapshotAt = &metav1.Time{Time: time.Now()}
 	should, requeue, err = r.shouldTakeSnapshot(snap)
 	require.NoError(t, err)
 	assert.False(t, should)

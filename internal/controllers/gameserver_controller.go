@@ -272,7 +272,12 @@ func agentAddress(server *operatorv1.GameServer) string {
 // dialAgent establishes a gRPC connection to the agent for the given GameServer.
 func dialAgent(server *operatorv1.GameServer) (*grpc.ClientConn, error) {
 	addr := agentAddress(server)
-	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			MinConnectTimeout: healthCheckTimeout,
+		}),
+	)
 }
 
 func (r *GameServerReconciler) checkAgentHealth(ctx context.Context, server *operatorv1.GameServer) (string, bool) {
