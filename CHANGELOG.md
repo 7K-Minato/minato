@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.0 (2026-06-09)
+
+
+### Features
+
+* complete Phase 6 - comprehensive OSS documentation and architecture sync ([b4a1bff](https://github.com/7K-Minato/minato/commit/b4a1bff7c4e978d5bf98393bf704d231229a9c30))
+* complete v1 release preparation ([b76d44b](https://github.com/7K-Minato/minato/commit/b76d44b13d4055569072b608e69cecd16d91958a))
+
 ## [Unreleased]
 
 ### Added
