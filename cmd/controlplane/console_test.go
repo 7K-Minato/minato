@@ -133,7 +133,9 @@ func newFakeWSConn(t *testing.T) (*websocket.Conn, *websocket.Conn) {
 
 	var serverConn *websocket.Conn
 	var upgradeErr error
+	done := make(chan struct{})
 	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(done)
 		serverConn, upgradeErr = upgrader.Upgrade(w, r, nil)
 	}))
 	defer httpServer.Close()
@@ -144,6 +146,9 @@ func newFakeWSConn(t *testing.T) (*websocket.Conn, *websocket.Conn) {
 	if err != nil {
 		t.Fatalf("failed to dial test websocket server: %v", err)
 	}
+
+	<-done // wait for handler to finish so serverConn is assigned
+
 	if upgradeErr != nil {
 		t.Fatalf("server upgrade failed: %v", upgradeErr)
 	}
