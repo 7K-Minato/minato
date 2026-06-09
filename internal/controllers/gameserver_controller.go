@@ -576,7 +576,7 @@ func buildPVC(server *operatorv1.GameServer, profile *operatorv1.GameProfile) *c
 			snapNamespace = server.Namespace
 		}
 		pvc.Spec.DataSource = &corev1.TypedLocalObjectReference{
-			APIGroup: strPtr("snapshot.storage.k8s.io"),
+			APIGroup: new("snapshot.storage.k8s.io"),
 			Kind:     "VolumeSnapshot",
 			Name:     server.Spec.Storage.SnapshotRef.Name,
 		}
@@ -591,10 +591,6 @@ func buildPVC(server *operatorv1.GameServer, profile *operatorv1.GameProfile) *c
 	}
 
 	return pvc
-}
-
-func strPtr(s string) *string {
-	return &s
 }
 
 func buildGameServerLabels(server *operatorv1.GameServer, profile *operatorv1.GameProfile) map[string]string {

@@ -409,7 +409,7 @@ func (api *controlPlaneAPI) createAPIKey(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Return the key value ONCE - it will never be shown again
-	respondJSON(w, map[string]interface{}{
+	respondJSON(w, map[string]any{
 		"name":      entry.Name,
 		"role":      entry.Role,
 		"createdAt": entry.CreatedAt,
