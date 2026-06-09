@@ -1412,7 +1412,7 @@ const file_minato_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"GetPlayers\x12\x1f.minato.agent.v1.PlayersRequest\x1a .minato.agent.v1.PlayersResponse\x12^\n" +
 	"\rExecuteAction\x12%.minato.agent.v1.ExecuteActionRequest\x1a&.minato.agent.v1.ExecuteActionResponse\x12[\n" +
-	"\aConsole\x12%.minato.agent.v1.ConsoleClientMessage\x1a%.minato.agent.v1.ConsoleServerMessage(\x010\x01BAZ?github.com/7k-minato/minato/api/agent/v1/minato/agent/v1;agentv1b\x06proto3"
+	"\aConsole\x12%.minato.agent.v1.ConsoleClientMessage\x1a%.minato.agent.v1.ConsoleServerMessage(\x010\x01BBZ@github.com/7k-minato/minato/api/agent/v1/minato/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_minato_agent_v1_agent_proto_rawDescOnce sync.Once
