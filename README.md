@@ -1,6 +1,6 @@
 # Minato (南)
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/7k-group/minato/ci.yml?branch=main)](https://github.com/7k-minato/minato/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/7k-minato/minato/ci.yml?branch=main)](https://github.com/7k-minato/minato/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/7k-minato/minato)](https://goreportcard.com/report/github.com/7k-minato/minato)
 [![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](https://github.com/7k-minato/minato)
 [![Go Version](https://img.shields.io/badge/go-1.23-blue)](https://golang.org)
@@ -52,7 +52,7 @@ The operator reconciles CRDs into Kubernetes resources (StatefulSets, PVCs, Serv
 ### Install with Helm
 
 ```bash
-helm repo add minato https://7k-group.github.io/minato
+helm repo add minato https://7k-minato.github.io/minato
 helm repo update
 helm install minato minato/minato \
   --namespace minato-system \

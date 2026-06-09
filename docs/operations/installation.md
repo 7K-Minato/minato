@@ -17,7 +17,7 @@ This guide covers installing Minato on a Kubernetes cluster.
 
 ```bash
 # Add the Minato Helm repository
-helm repo add minato https://7k-group.github.io/minato
+helm repo add minato https://7k-minato.github.io/minato
 helm repo update
 
 # Install with default values
