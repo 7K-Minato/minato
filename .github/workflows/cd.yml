@@ -110,8 +110,6 @@ jobs:
           - component: controlplane
             dockerfile: Dockerfile.controlplane
             image-name: minato-controlplane
-    env:
-      IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
@@ -137,6 +135,8 @@ jobs:
 
       - name: Extract metadata
         id: meta
+        env:
+          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
         uses: docker/metadata-action@v6.0.0
         with:
           images: ${{ env.IMAGE }}
@@ -164,11 +164,13 @@ jobs:
       - name: Sign image with cosign (keyless)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
       - name: Verify signature
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
         run: |
           cosign verify \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
@@ -178,13 +180,14 @@ jobs:
       - name: Generate SBOM
         uses: anchore/sbom-action@v0.18.0
         with:
-          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          image: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           output-file: sbom.spdx.json
 
       - name: Attest SBOM to image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
         run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${IMAGE}@${DIGEST}"
 
   # Build and publish Helm chart to Harbor OCI
