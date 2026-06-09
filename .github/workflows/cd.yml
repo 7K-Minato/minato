@@ -212,8 +212,9 @@ jobs:
 
       - name: Package Helm chart
         id: package
+        #CHART_VERSION=${{ needs.release-please.outputs.version }}
         run: |
-          CHART_VERSION=${{ needs.release-please.outputs.version }}
+          CHART_VERSION=1.0.0
           helm package deploy/helm/minato --version "$CHART_VERSION" --destination .cr-release-packages
           CHART_NAME=$(awk '/^name:/ {print $2; exit}' deploy/helm/minato/Chart.yaml)
           PACKAGE="${CHART_NAME}-${CHART_VERSION}.tgz"
