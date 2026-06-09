@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
+	agentv1 "github.com/7k-minato/minato/api/agent/v1/minato/agent/v1"
 )
 
 type Agent interface {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/7k-group/minato/internal/controlplane/auth"
+	"github.com/7k-minato/minato/internal/controlplane/auth"
 )
 
 // Role defines permissions for a role.

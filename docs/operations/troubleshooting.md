@@ -316,7 +316,7 @@ A: Yes! Create a GameProfile with your image and configure the agent appropriate
 If your issue isn't covered here:
 
 1. Check the [runbooks](runbooks/) for specific scenarios
-2. Search existing [GitHub issues](https://github.com/7k-group/minato/issues)
+2. Search existing [GitHub issues](https://github.com/7k-minato/minato/issues)
 3. Join our community discussions
 4. Open a new issue with:
    - Minato version

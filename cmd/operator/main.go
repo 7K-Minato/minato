@@ -20,9 +20,9 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
-	"github.com/7k-group/minato/internal/controllers"
-	minatowebhook "github.com/7k-group/minato/internal/webhook"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/internal/controllers"
+	minatowebhook "github.com/7k-minato/minato/internal/webhook"
 )
 
 var (

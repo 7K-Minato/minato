@@ -19,10 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
-	"github.com/7k-group/minato/internal/controlplane/audit"
-	"github.com/7k-group/minato/internal/controlplane/auth"
-	"github.com/7k-group/minato/internal/controlplane/rbac"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/internal/controlplane/audit"
+	"github.com/7k-minato/minato/internal/controlplane/auth"
+	"github.com/7k-minato/minato/internal/controlplane/rbac"
 )
 
 func main() {

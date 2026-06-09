@@ -6,7 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
 
 const (

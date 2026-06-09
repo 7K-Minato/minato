@@ -21,8 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
-	"github.com/7k-group/minato/internal/controllers/builder"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/internal/controllers/builder"
 )
 
 var _ = monitoringv1.ServiceMonitor{}

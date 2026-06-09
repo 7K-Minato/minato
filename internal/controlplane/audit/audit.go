@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/7k-group/minato/internal/controlplane/auth"
+	"github.com/7k-minato/minato/internal/controlplane/auth"
 )
 
 // Event represents an audit event.

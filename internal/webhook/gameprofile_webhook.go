@@ -8,7 +8,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
 
 var gameprofilelog = logf.Log.WithName("gameprofile-webhook")

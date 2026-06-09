@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
-	"github.com/7k-group/minato/internal/controllers"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/internal/controllers"
 )
 
 var (

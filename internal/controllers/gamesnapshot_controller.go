@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	agentv1 "github.com/7k-group/minato/api/agent/v1/minato/agent/v1"
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	agentv1 "github.com/7k-minato/minato/api/agent/v1/minato/agent/v1"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
 
 const (

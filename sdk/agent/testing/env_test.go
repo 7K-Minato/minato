@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/7k-group/minato/sdk/agent/rcon"
+	"github.com/7k-minato/minato/sdk/agent/rcon"
 )
 
 func TestNewFakeAgentEnv(t *testing.T) {

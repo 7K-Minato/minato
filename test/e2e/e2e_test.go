@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/7k-group/minato/test/utils"
+	"github.com/7k-minato/minato/test/utils"
 )
 
 // namespace where the project is deployed in

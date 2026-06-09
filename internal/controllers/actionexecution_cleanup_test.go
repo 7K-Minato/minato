@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
 
 func TestActionExecutionCleanupTask_Cleanup(t *testing.T) {

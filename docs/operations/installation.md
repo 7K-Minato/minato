@@ -33,7 +33,7 @@ kubectl get pods -n minato-system
 
 ```bash
 # Clone the repository
-git clone https://github.com/7k-group/minato.git
+git clone https://github.com/7k-minato/minato.git
 cd minato
 
 # Install CRDs
@@ -128,11 +128,11 @@ kubectl get crds | grep minato
 
 ### Create a Test GameServer
 
-Game profiles are maintained in the [minato-games](https://github.com/7k-group/minato-games) repository.
+Game profiles are maintained in the [minato-games](https://github.com/7k-minato/minato-games) repository.
 
 ```bash
 # Clone the games repository and apply a profile
-git clone https://github.com/7k-group/minato-games.git
+git clone https://github.com/7k-minato/minato-games.git
 cd minato-games
 kubectl apply -f profiles/minecraft-paper/profile.yaml
 

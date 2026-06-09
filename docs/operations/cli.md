@@ -5,7 +5,7 @@ The official CLI for interacting with the Minato control plane.
 ## Installation
 
 ```bash
-go install github.com/7k-group/minato/cmd/minato-ctl@latest
+go install github.com/7k-minato/minato/cmd/minato-ctl@latest
 ```
 
 ## Configuration

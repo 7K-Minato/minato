@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	operatorv1 "github.com/7k-group/minato/api/operator/v1"
+	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
 
 const (
