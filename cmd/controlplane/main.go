@@ -456,16 +456,16 @@ func (api *controlPlaneAPI) getAuthConfig(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	config := map[string]any{
+	responseConfig := map[string]any{
 		"authModes":    modes,
 		"basicEnabled": api.authCfg.Basic.Enabled,
 	}
 
 	if api.authCfg.OIDC.Enabled && api.authCfg.OIDC.IssuerURL != "" {
-		config["oidcIssuer"] = api.authCfg.OIDC.IssuerURL
+		responseConfig["oidcIssuer"] = api.authCfg.OIDC.IssuerURL
 	}
 
-	respondJSON(w, config)
+	respondJSON(w, responseConfig)
 }
 
 func respondJSON(w http.ResponseWriter, data any) {
