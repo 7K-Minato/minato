@@ -63,6 +63,9 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	// Auth configuration endpoint (always public, used by UI for discovery)
+	r.Get("/auth/config", api.getAuthConfig)
+
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
 		// GameServers - viewer+ can read
