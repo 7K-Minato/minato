@@ -4,7 +4,7 @@
 operator:
   enabled: true
   image:
-    repository: ghcr.io/7k-group/minato-operator
+    repository: harbor.7kgroup.com/minato/minato-operator
     tag: "v1.0.0"
     pullPolicy: IfNotPresent
   
@@ -58,7 +58,7 @@ operator:
 controlPlane:
   enabled: true
   image:
-    repository: ghcr.io/7k-group/minato-controlplane
+    repository: harbor.7kgroup.com/minato/minato-controlplane
     tag: "v1.0.0"
     pullPolicy: IfNotPresent
   

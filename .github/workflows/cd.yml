@@ -11,6 +11,10 @@ permissions:
   packages: write
   id-token: write
 
+env:
+  HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+  HARBOR_PROJECT: ${{ secrets.HARBOR_PROJECT }}
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
@@ -20,6 +24,7 @@ jobs:
       major: ${{ steps.release.outputs.major }}
       minor: ${{ steps.release.outputs.minor }}
       patch: ${{ steps.release.outputs.patch }}
+      version: ${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
     steps:
       - name: Release Please
         id: release
@@ -69,7 +74,7 @@ jobs:
                 EXT=".exe"
               fi
               
-              for binary in operator controlplane minato-ctl agent-generic; do
+              for binary in operator controlplane minato-ctl; do
                 echo "Building minato-${binary} for ${os}/${arch}..."
                 GOOS=$os GOARCH=$arch CGO_ENABLED=0 \
                   go build -ldflags="-s -w -X main.version=${VERSION}" \
@@ -90,23 +95,108 @@ jobs:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: dist/*
 
-  # Build and publish container images for releases
+  # Build and publish container images to Harbor
   publish-images:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/reusable-build-images.yml
-    with:
-      push: true
-    secrets: inherit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      matrix:
+        include:
+          - component: operator
+            dockerfile: Dockerfile
+            image-name: minato-operator
+          - component: controlplane
+            dockerfile: Dockerfile.controlplane
+            image-name: minato-controlplane
+    env:
+      IMAGE: ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${{ matrix.image-name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
-  # Build and publish Helm chart
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba4eb87ffd # v3.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.2
+
+      - name: Login to Harbor
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ secrets.HARBOR_REGISTRY }}
+          username: ${{ secrets.HARBOR_ROBOT_NAME }}
+          password: ${{ secrets.HARBOR_ROBOT_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.release-please.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.release-please.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: true
+
+      - name: Sign image with cosign (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Verify signature
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/\.github/workflows/cd\.yml@.*$' \
+            "${IMAGE}@${DIGEST}"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Attest SBOM to image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${IMAGE}@${DIGEST}"
+
+  # Build and publish Helm chart to Harbor OCI
   publish-helm:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -117,25 +207,65 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
-          version: v3.14.0
+          version: v3.17.3
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.2
 
       - name: Package Helm chart
+        id: package
         run: |
-          helm package deploy/helm/minato --destination .cr-release-packages
+          CHART_VERSION=${{ needs.release-please.outputs.version }}
+          helm package deploy/helm/minato --version "$CHART_VERSION" --destination .cr-release-packages
+          CHART_NAME=$(awk '/^name:/ {print $2; exit}' deploy/helm/minato/Chart.yaml)
+          PACKAGE="${CHART_NAME}-${CHART_VERSION}.tgz"
+          test -f ".cr-release-packages/${PACKAGE}"
+          echo "name=${CHART_NAME}" >> "$GITHUB_OUTPUT"
+          echo "package=.cr-release-packages/${PACKAGE}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload Helm chart to release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
-        with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
-          files: .cr-release-packages/*.tgz
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push Helm chart to OCI registry
+      - name: Login to Harbor (OCI)
+        env:
+          HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+          HARBOR_ROBOT_NAME: ${{ secrets.HARBOR_ROBOT_NAME }}
+          HARBOR_ROBOT_TOKEN: ${{ secrets.HARBOR_ROBOT_TOKEN }}
         run: |
-          helm push .cr-release-packages/*.tgz oci://ghcr.io/${{ github.repository }}/charts
+          echo "$HARBOR_ROBOT_TOKEN" | \
+            helm registry login "$HARBOR_REGISTRY" \
+              --username "$HARBOR_ROBOT_NAME" \
+              --password-stdin
+          echo "$HARBOR_ROBOT_TOKEN" | \
+            cosign login "$HARBOR_REGISTRY" \
+              --username "$HARBOR_ROBOT_NAME" \
+              --password-stdin
+
+      - name: Push chart to Harbor
+        id: push
+        env:
+          HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+          HARBOR_PROJECT: ${{ secrets.HARBOR_PROJECT }}
+          CHART_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE: ${{ steps.package.outputs.package }}
+        run: |
+          REF="oci://${HARBOR_REGISTRY}/${HARBOR_PROJECT}/charts"
+          if ! OUTPUT=$(helm push "$PACKAGE" "$REF" 2>&1); then
+            echo "$OUTPUT"
+            exit 1
+          fi
+          echo "$OUTPUT"
+          DIGEST=$(echo "$OUTPUT" | grep -oP 'Digest: \K\S+')
+          if [ -z "$DIGEST" ]; then
+            echo "ERROR: could not parse digest from helm push output" >&2
+            exit 1
+          fi
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "ref=${HARBOR_REGISTRY}/${HARBOR_PROJECT}/charts/${CHART_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign chart with cosign (keyless)
+        run: cosign sign --yes "${{ steps.push.outputs.ref }}@${{ steps.push.outputs.digest }}"
+
+      - name: Verify signature
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github\.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/\.github/workflows/cd\.yml@.*$' \
+            "${{ steps.push.outputs.ref }}@${{ steps.push.outputs.digest }}"

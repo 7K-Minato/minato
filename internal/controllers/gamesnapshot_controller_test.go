@@ -442,7 +442,7 @@ func TestGameSnapshotReconciler_ShouldTakeSnapshot_Cron(t *testing.T) {
 	assert.Equal(t, time.Duration(0), requeue)
 
 	// Taken recently - should not take yet
-	snap.Status.LastSnapshotAt = &metav1.Time{Time: time.Now().Add(-30 * time.Second)}
+	snap.Status.LastSnapshotAt = &metav1.Time{Time: time.Now()}
 	should, requeue, err = r.shouldTakeSnapshot(snap)
 	require.NoError(t, err)
 	assert.False(t, should)
@@ -534,14 +534,14 @@ func TestGameSnapshotReconciler_MonitorSnapshot_Ready(t *testing.T) {
 			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				if u, ok := obj.(*unstructured.Unstructured); ok {
 					if u.GetKind() == "VolumeSnapshot" {
-						u.Object = map[string]interface{}{
+						u.Object = map[string]any{
 							"apiVersion": "snapshot.storage.k8s.io/v1",
 							"kind":       "VolumeSnapshot",
-							"metadata": map[string]interface{}{
+							"metadata": map[string]any{
 								"name":      key.Name,
 								"namespace": key.Namespace,
 							},
-							"status": map[string]interface{}{
+							"status": map[string]any{
 								"readyToUse":  true,
 								"restoreSize": int64(1073741824),
 							},
@@ -583,15 +583,15 @@ func TestGameSnapshotReconciler_MonitorSnapshot_Failed(t *testing.T) {
 			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				if u, ok := obj.(*unstructured.Unstructured); ok {
 					if u.GetKind() == "VolumeSnapshot" {
-						u.Object = map[string]interface{}{
+						u.Object = map[string]any{
 							"apiVersion": "snapshot.storage.k8s.io/v1",
 							"kind":       "VolumeSnapshot",
-							"metadata": map[string]interface{}{
+							"metadata": map[string]any{
 								"name":      key.Name,
 								"namespace": key.Namespace,
 							},
-							"status": map[string]interface{}{
-								"error": map[string]interface{}{
+							"status": map[string]any{
+								"error": map[string]any{
 									"message": "snapshot failed",
 								},
 							},

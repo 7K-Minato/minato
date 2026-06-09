@@ -29,11 +29,11 @@ type APIKeyStorage struct {
 
 // APIKeyEntry represents a stored API key.
 type APIKeyEntry struct {
-	Name      string    `json:"name"`      // Human-readable name (e.g., "ci-cd-pipeline")
-	KeyID     string    `json:"keyId"`     // The actual key value (minato_...)
-	UserID    string    `json:"userId"`    // Who created it
-	Username  string    `json:"username"`  // Human-readable username
-	Role      string    `json:"role"`      // Role assigned to this key
+	Name      string    `json:"name"`     // Human-readable name (e.g., "ci-cd-pipeline")
+	KeyID     string    `json:"keyId"`    // The actual key value (minato_...)
+	UserID    string    `json:"userId"`   // Who created it
+	Username  string    `json:"username"` // Human-readable username
+	Role      string    `json:"role"`     // Role assigned to this key
 	CreatedAt time.Time `json:"createdAt"`
 }
 
@@ -138,7 +138,7 @@ func (s *APIKeyStorage) toSecret(entry *APIKeyEntry) *corev1.Secret {
 			Name:      apiKeySecretPrefix + entry.Name,
 			Namespace: s.namespace,
 			Labels: map[string]string{
-				apiKeySecretLabel: "true",
+				apiKeySecretLabel:      "true",
 				"minato.io/created-by": entry.Username,
 			},
 		},

@@ -58,8 +58,6 @@ jobs:
             -o "dist/minato-controlplane-${{ matrix.os }}-${{ matrix.arch }}" ./cmd/controlplane
           go build -ldflags="-s -w -X main.version=${VERSION}" \
             -o "dist/minato-ctl-${{ matrix.os }}-${{ matrix.arch }}" ./cmd/minato-ctl
-          go build -ldflags="-s -w -X main.version=${VERSION}" \
-            -o "dist/minato-agent-generic-${{ matrix.os }}-${{ matrix.arch }}" ./cmd/agents/generic
 
       - name: Upload binaries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

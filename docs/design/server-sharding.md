@@ -297,7 +297,7 @@ When we have a real use case (e.g., a customer running a 5,000-player MMO), then
 
 1. **Document the pattern:** Add a doc showing how to use GameServerFleet for sharding (env vars, labels, DNS-based discovery)
 2. **Enhance agent SDK:** Add `GetShardTopology` to the agent gRPC API (optional, no-op default)
-3. **Profile examples:** Add a Minecraft network example (fleet + proxy) to `profiles/`
+3. **Profile examples:** Add a Minecraft network example (fleet + proxy) to [minato-games](https://github.com/7k-group/minato-games)
 4. **NO CRD changes:** The existing GameServerFleet is sufficient
 
 ---

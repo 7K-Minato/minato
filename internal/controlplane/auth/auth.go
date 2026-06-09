@@ -137,10 +137,10 @@ func ConstantTimeCompare(a, b string) bool {
 
 // Config holds authentication configuration.
 type Config struct {
-	Mode    string       `json:"mode"` // none, basic, oidc, apikey, or comma-separated list
-	Basic   BasicConfig  `json:"basic"`
-	OIDC    OIDCConfig   `json:"oidc"`
-	APIKey  APIKeyConfig `json:"apikey"`
+	Mode   string       `json:"mode"` // none, basic, oidc, apikey, or comma-separated list
+	Basic  BasicConfig  `json:"basic"`
+	OIDC   OIDCConfig   `json:"oidc"`
+	APIKey APIKeyConfig `json:"apikey"`
 }
 
 // BasicConfig holds basic auth configuration.
@@ -197,8 +197,8 @@ func BuildChain(cfg *Config) (*Chain, error) {
 func BuildChainWithStorage(cfg *Config, keyStorage *APIKeyStorage) (*Chain, error) {
 	chain := NewChain()
 
-	modes := strings.Split(cfg.Mode, ",")
-	for _, mode := range modes {
+	modes := strings.SplitSeq(cfg.Mode, ",")
+	for mode := range modes {
 		mode = strings.TrimSpace(strings.ToLower(mode))
 		switch mode {
 		case "none":

@@ -21,7 +21,7 @@ const (
 	gameServerFleetFinalizer = "minato.io/gameserverfleet-finalizer"
 
 	// Fleet labels
-	fleetLabel          = "minato.io/fleet"
+	fleetLabel           = "minato.io/fleet"
 	fleetGenerationLabel = "minato.io/fleet-generation"
 )
 
@@ -101,12 +101,10 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Handle scale down: delete excess GameServers (player-aware)
 	if currentReplicas > desiredReplicas {
-		toDelete := r.selectServersToDelete(ctx, existingServers.Items, desiredReplicas, updateStrategy)
+		toDelete := r.selectServersToDelete(existingServers.Items, desiredReplicas, updateStrategy)
 		for _, server := range toDelete {
 			// Graceful drain: call agent shutdown before deletion
-			if err := r.drainServer(ctx, &server); err != nil {
-				logger.Error(err, "failed to drain GameServer, deleting anyway", "name", server.Name)
-			}
+			r.drainServer(ctx, &server)
 			if err := r.Delete(ctx, &server); err != nil && !apierrors.IsNotFound(err) {
 				logger.Error(err, "failed to delete GameServer", "name", server.Name)
 				return ctrl.Result{}, err
@@ -116,9 +114,7 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Handle rolling update: update GameServers that don't match fleet template
 	if updateStrategy == "RollingUpdate" {
-		if err := r.handleRollingUpdate(ctx, fleet, existingServers.Items); err != nil {
-			logger.Error(err, "failed to handle rolling update")
-		}
+		r.handleRollingUpdate(ctx, fleet, existingServers.Items)
 	}
 
 	// Update status
@@ -133,7 +129,6 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 // For RollingUpdate: prefer servers with 0 players, then oldest.
 // For OnDelete: return empty slice (user must delete manually).
 func (r *GameServerFleetReconciler) selectServersToDelete(
-	ctx context.Context,
 	servers []operatorv1.GameServer,
 	desiredReplicas int32,
 	updateStrategy string,
@@ -169,12 +164,12 @@ func (r *GameServerFleetReconciler) selectServersToDelete(
 
 // drainServer gracefully shuts down a GameServer before deletion.
 // This triggers the agent to save the world, notify players, etc.
-func (r *GameServerFleetReconciler) drainServer(ctx context.Context, server *operatorv1.GameServer) error {
+func (r *GameServerFleetReconciler) drainServer(ctx context.Context, server *operatorv1.GameServer) {
 	logger := log.FromContext(ctx)
 
 	// Only drain if server is running and has an agent
 	if server.Status.State != "Running" || server.Status.AgentVersion == "" {
-		return nil
+		return
 	}
 
 	// Call agent shutdown (similar to idle timeout logic)
@@ -183,8 +178,6 @@ func (r *GameServerFleetReconciler) drainServer(ctx context.Context, server *ope
 	// TODO: Implement agent shutdown call via gRPC
 	// For now, just log and proceed
 	// In production, this would call the agent's PrepareShutdown endpoint
-
-	return nil
 }
 
 // handleRollingUpdate updates GameServers when the fleet template changes.
@@ -193,7 +186,7 @@ func (r *GameServerFleetReconciler) handleRollingUpdate(
 	ctx context.Context,
 	fleet *operatorv1.GameServerFleet,
 	servers []operatorv1.GameServer,
-) error {
+) {
 	logger := log.FromContext(ctx)
 
 	fleetGeneration := fmt.Sprintf("%d", fleet.Generation)
@@ -244,9 +237,7 @@ func (r *GameServerFleetReconciler) handleRollingUpdate(
 		if updated.Spec.Env == nil {
 			updated.Spec.Env = make(map[string]string)
 		}
-		for k, v := range fleet.Spec.Template.Spec.Env {
-			updated.Spec.Env[k] = v
-		}
+		maps.Copy(updated.Spec.Env, fleet.Spec.Template.Spec.Env)
 
 		// Merge labels
 		if updated.Labels == nil {
@@ -265,8 +256,6 @@ func (r *GameServerFleetReconciler) handleRollingUpdate(
 			continue
 		}
 	}
-
-	return nil
 }
 
 func (r *GameServerFleetReconciler) buildGameServer(

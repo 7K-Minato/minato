@@ -27,16 +27,9 @@ import (
 const (
 	gameSnapshotFinalizer = "minato.io/gamesnapshot-finalizer"
 
-	// Snapshot phases
-	phasePending   = "Pending"
-	phaseSaving    = "Saving"
-	phaseSnapshotting = "Snapshotting"
-	phaseReady     = "Ready"
-	phaseFailed    = "Failed"
-
 	// Timeouts
-	saveTimeout      = 2 * time.Minute
-	snapshotTimeout  = 10 * time.Minute
+	saveTimeout     = 2 * time.Minute
+	snapshotTimeout = 10 * time.Minute
 )
 
 type GameSnapshotReconciler struct {
@@ -232,17 +225,17 @@ func (r *GameSnapshotReconciler) callAgentSave(ctx context.Context, server *oper
 	}
 	defer func() { _ = conn.Close() }()
 
-	client := agentv1.NewAgentClient(conn)
+	agentClient := agentv1.NewAgentClient(conn)
 
 	// Use ExecuteAction with a "save" action if available
-	_, err = client.ExecuteAction(ctx, &agentv1.ExecuteActionRequest{
+	_, err = agentClient.ExecuteAction(ctx, &agentv1.ExecuteActionRequest{
 		ActionName: "save",
 		Params:     map[string]string{},
 	})
 	if err != nil {
 		// If "save" action doesn't exist, try "prepare-shutdown" as fallback
 		// which typically triggers a save
-		_, err = client.PrepareShutdown(ctx, &agentv1.ShutdownRequest{
+		_, err = agentClient.PrepareShutdown(ctx, &agentv1.ShutdownRequest{
 			TimeoutSeconds: 60,
 			DrainReason:    "snapshot",
 		})

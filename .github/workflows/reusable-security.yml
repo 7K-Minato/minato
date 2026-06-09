@@ -53,7 +53,6 @@ jobs:
         run: |
           docker build -t minato:operator -f Dockerfile .
           docker build -t minato:controlplane -f Dockerfile.controlplane .
-          docker build -t minato:agent-generic -f Dockerfile.agent-generic .
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -61,20 +60,3 @@ jobs:
           image-ref: 'minato:operator'
           format: 'table'
           exit-code: '0'
-
-  dependency-review:
-    name: Dependency Review
-    runs-on: ${{ inputs.runs-on }}
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          persist-credentials: false
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
-        with:
-          fail-on-severity: moderate

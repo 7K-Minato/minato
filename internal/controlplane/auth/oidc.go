@@ -17,7 +17,6 @@ type OIDCProvider struct {
 	issuerURL string
 	clientID  string
 	roleClaim string
-	jwksURL   string
 	keys      map[string]*jwt.SigningMethodRSA
 	mu        sync.RWMutex
 	lastFetch time.Time
@@ -57,12 +56,11 @@ func (p *OIDCProvider) Authenticate(r *http.Request) (*User, error) {
 	p.mu.RUnlock()
 
 	if time.Since(lastFetch) > time.Hour {
-		if err := p.fetchJWKS(); err != nil {
-			// Log but don't fail - use cached keys
-		}
+		// Refresh JWKS in the background; on failure, continue with cached keys.
+		_ = p.fetchJWKS()
 	}
 
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		// Ensure RSA signing method
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -90,7 +88,7 @@ func (p *OIDCProvider) Authenticate(r *http.Request) (*User, error) {
 	claims, ok := parsed.Claims.(jwt.MapClaims)
 	if !ok {
 		return nil, ErrUnauthorized
-	
+
 	}
 
 	// Extract role from claims
@@ -100,7 +98,7 @@ func (p *OIDCProvider) Authenticate(r *http.Request) (*User, error) {
 			switch v := rawRoles.(type) {
 			case string:
 				role = v
-			case []interface{}:
+			case []any:
 				if len(v) > 0 {
 					if s, ok := v[0].(string); ok {
 						role = s
@@ -143,13 +141,13 @@ func (p *OIDCProvider) fetchJWKS() error {
 	// This is a simplified implementation
 	// In production, you'd fetch from .well-known/openid-configuration
 	// then parse the jwks_uri response
-	
+
 	discoveryURL := p.issuerURL + "/.well-known/openid-configuration"
 	resp, err := http.Get(discoveryURL)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var config struct {
 		JWKSURI string `json:"jwks_uri"`
@@ -167,7 +165,7 @@ func (p *OIDCProvider) fetchJWKS() error {
 	if err != nil {
 		return err
 	}
-	defer jwksResp.Body.Close()
+	defer func() { _ = jwksResp.Body.Close() }()
 
 	var jwks struct {
 		Keys []struct {
@@ -186,6 +184,6 @@ func (p *OIDCProvider) fetchJWKS() error {
 	p.lastFetch = time.Now()
 	// Parse keys and store them
 	// This is simplified - full implementation would parse RSA keys from base64
-	
+
 	return nil
 }

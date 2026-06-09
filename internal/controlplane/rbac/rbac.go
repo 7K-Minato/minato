@@ -3,6 +3,7 @@ package rbac
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/7k-group/minato/internal/controlplane/auth"
 )
@@ -110,11 +111,9 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 				return
 			}
 
-			for _, role := range roles {
-				if user.Role == role {
-					next.ServeHTTP(w, r)
-					return
-				}
+			if slices.Contains(roles, user.Role) {
+				next.ServeHTTP(w, r)
+				return
 			}
 
 			http.Error(w, "Forbidden", http.StatusForbidden)

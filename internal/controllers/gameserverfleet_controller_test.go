@@ -315,7 +315,6 @@ func TestGameServerFleetReconciler_SetupWithManager(t *testing.T) {
 func TestGameServerFleetReconciler_SelectServersToDelete_PlayerAware(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = operatorv1.AddToScheme(scheme)
-	ctx := context.Background()
 
 	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
 	r := &GameServerFleetReconciler{Client: cl, Scheme: scheme}
@@ -327,7 +326,7 @@ func TestGameServerFleetReconciler_SelectServersToDelete_PlayerAware(t *testing.
 	}
 
 	// Scale from 3 to 1: should delete empty server first, then lowest players
-	toDelete := r.selectServersToDelete(ctx, servers, 1, "RollingUpdate")
+	toDelete := r.selectServersToDelete(servers, 1, "RollingUpdate")
 	require.Len(t, toDelete, 2)
 	assert.Equal(t, "fleet-1", toDelete[0].Name) // 0 players
 	assert.Equal(t, "fleet-2", toDelete[1].Name) // 2 players

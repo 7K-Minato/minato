@@ -70,8 +70,12 @@ make deploy
 
 ### Create a Minecraft Server
 
+Game profiles are maintained in the [minato-games](https://github.com/7k-group/minato-games) repository.
+
 ```bash
-# Apply the Minecraft Paper profile
+# Clone the games repository and apply the Minecraft Paper profile
+git clone https://github.com/7k-group/minato-games.git
+cd minato-games
 kubectl apply -f profiles/minecraft-paper/profile.yaml
 
 # Create a game server
@@ -125,7 +129,7 @@ spec:
     mountPath: /data
     sizeDefault: 10Gi
   agent:
-    image: "ghcr.io/7k-group/minato-agent-minecraft:v0.1.0"
+    image: "harbor.7kgroup.com/minato-games/minato-agent-minecraft:v0.1.0"
 ```
 
 ### GameServer (Namespace-scoped)
@@ -243,7 +247,7 @@ minato/
 ├── cmd/                    # Binaries (operator, control plane, agents, CLI)
 ├── internal/controllers/   # Operator reconcilers
 ├── sdk/agent/              # Public Agent SDK
-├── profiles/               # Curated GameProfile YAMLs
+├── deploy/helm/            # Helm chart
 ├── deploy/helm/            # Helm chart
 ├── config/                 # Kustomize configs, CRDs, RBAC
 └── docs/                   # Documentation

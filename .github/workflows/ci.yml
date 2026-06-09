@@ -94,6 +94,3 @@ jobs:
     needs: [lint, unit-tests]
     if: ${{ needs.changes.outputs.go == 'true' || needs.changes.outputs.docker == 'true' }}
     uses: ./.github/workflows/reusable-build-images.yml
-    with:
-      push: false
-    secrets: inherit

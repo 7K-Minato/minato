@@ -272,7 +272,12 @@ func agentAddress(server *operatorv1.GameServer) string {
 // dialAgent establishes a gRPC connection to the agent for the given GameServer.
 func dialAgent(server *operatorv1.GameServer) (*grpc.ClientConn, error) {
 	addr := agentAddress(server)
-	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			MinConnectTimeout: healthCheckTimeout,
+		}),
+	)
 }
 
 func (r *GameServerReconciler) checkAgentHealth(ctx context.Context, server *operatorv1.GameServer) (string, bool) {
@@ -576,7 +581,7 @@ func buildPVC(server *operatorv1.GameServer, profile *operatorv1.GameProfile) *c
 			snapNamespace = server.Namespace
 		}
 		pvc.Spec.DataSource = &corev1.TypedLocalObjectReference{
-			APIGroup: strPtr("snapshot.storage.k8s.io"),
+			APIGroup: new("snapshot.storage.k8s.io"),
 			Kind:     "VolumeSnapshot",
 			Name:     server.Spec.Storage.SnapshotRef.Name,
 		}
@@ -591,10 +596,6 @@ func buildPVC(server *operatorv1.GameServer, profile *operatorv1.GameProfile) *c
 	}
 
 	return pvc
-}
-
-func strPtr(s string) *string {
-	return &s
 }
 
 func buildGameServerLabels(server *operatorv1.GameServer, profile *operatorv1.GameProfile) map[string]string {

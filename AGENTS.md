@@ -217,12 +217,7 @@ minato/
 │   └── agent/v1/            # Agent gRPC protobuf definitions
 ├── cmd/
 │   ├── operator/            # minato operator binary
-│   ├── controlplane/        # Control plane API binary
-│   └── agents/              # Bundled agents
-│       ├── generic/         # YAML-action-interpreting agent
-│       ├── minecraft/
-│       ├── csgo/            # (or cs2/)
-│       └── palworld/
+│   └── controlplane/        # Control plane API binary
 ├── internal/
 │   ├── controllers/         # operator reconcilers
 │   ├── webhook/             # validating + conversion webhooks
@@ -245,10 +240,6 @@ minato/
 │   ├── controlplane/
 │   ├── samples/
 │   └── tests/               # kustomizations for e2e tests
-├── profiles/                # Curated GameProfile YAMLs
-│   ├── minecraft-paper/
-│   ├── cs2/                 # or csgo/
-│   └── palworld/
 ├── deploy/
 │   ├── helm/
 │   │   └── minato/          # Helm chart
@@ -260,6 +251,8 @@ minato/
 │   └── adrs/
 └── Makefile
 ```
+
+> **Note:** All agents (game-specific and generic) and curated GameProfile YAMLs live in the separate [`minato-games`](https://github.com/7k-group/minato-games) repository. This repository contains only the game-agnostic operator, control plane, and SDK.
 
 ## Working agreement
 

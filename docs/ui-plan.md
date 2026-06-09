@@ -782,7 +782,7 @@ spec:
     spec:
       containers:
       - name: ui
-        image: ghcr.io/7k-group/minato-ui:v0.1.0
+        image: harbor.7kgroup.com/minato/minato-ui:v0.1.0
         ports:
         - containerPort: 80
         env:
