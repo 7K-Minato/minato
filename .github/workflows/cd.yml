@@ -228,12 +228,14 @@ jobs:
           HARBOR_ROBOT_NAME: ${{ secrets.HARBOR_ROBOT_NAME }}
           HARBOR_ROBOT_TOKEN: ${{ secrets.HARBOR_ROBOT_TOKEN }}
         run: |
+          REGISTRY_HOST="${HARBOR_REGISTRY#https://}"
+          REGISTRY_HOST="${REGISTRY_HOST#http://}"
           echo "$HARBOR_ROBOT_TOKEN" | \
             helm registry login "$HARBOR_REGISTRY" \
               --username "$HARBOR_ROBOT_NAME" \
               --password-stdin
           echo "$HARBOR_ROBOT_TOKEN" | \
-            cosign login "$HARBOR_REGISTRY" \
+            cosign login "$REGISTRY_HOST" \
               --username "$HARBOR_ROBOT_NAME" \
               --password-stdin
 
