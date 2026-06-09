@@ -15,28 +15,28 @@ env:
   HARBOR_PROJECT: ${{ secrets.HARBOR_PROJECT }}
 
 jobs:
-  #release-please:
-  #  runs-on: ubuntu-latest
-  #  outputs:
-  #    release_created: ${{ steps.release.outputs.release_created }}
-  #    tag_name: ${{ steps.release.outputs.tag_name }}
-  #    major: ${{ steps.release.outputs.major }}
-  #    minor: ${{ steps.release.outputs.minor }}
-  #    patch: ${{ steps.release.outputs.patch }}
-  #    version: ${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
-  #  steps:
-  #    - name: Release Please
-  #      id: release
-  #      uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
-  #      with:
-  #        token: ${{ secrets.GITHUB_TOKEN }}
-  #        release-type: go
-  #        config-file: .release-please-config.json
-  #        manifest-file: .release-please-manifest.json
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
+      patch: ${{ steps.release.outputs.patch }}
+      version: ${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
+    steps:
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: go
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
 
   # Build and publish release artifacts when release-please creates a release
   publish-release:
-  #  needs: release-please
+    needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -95,8 +95,8 @@ jobs:
 
   # Build and publish container images to Harbor
   publish-images:
-  #  needs: release-please
-  #  if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -202,8 +202,8 @@ jobs:
 
   # Build and publish Helm chart to Harbor OCI
   publish-helm:
-  #  needs: release-please
-  #  if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -225,9 +225,8 @@ jobs:
 
       - name: Package Helm chart
         id: package
-        #CHART_VERSION=${{ needs.release-please.outputs.version }}
         run: |
-          CHART_VERSION=1.0.0
+          CHART_VERSION=${{ needs.release-please.outputs.version }}
           helm package deploy/helm/minato --version "$CHART_VERSION" --destination .cr-release-packages
           CHART_NAME=$(awk '/^name:/ {print $2; exit}' deploy/helm/minato/Chart.yaml)
           PACKAGE="${CHART_NAME}-${CHART_VERSION}.tgz"
