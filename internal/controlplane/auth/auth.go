@@ -89,8 +89,8 @@ func (c *Chain) Authenticate(r *http.Request) (*User, error) {
 func Middleware(chain *Chain) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Always allow health endpoints
-			if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
+			// Always allow public endpoints
+			if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/auth/config" {
 				next.ServeHTTP(w, r)
 				return
 			}
