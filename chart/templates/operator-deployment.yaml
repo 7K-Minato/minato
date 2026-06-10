@@ -30,7 +30,7 @@ spec:
       serviceAccountName: {{ include "minato.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.operator.securityContext | nindent 8 }}
-      {{- if .Values.webhook.enabled }}
+      {{- if and .Values.webhook.enabled (not .Values.webhook.certManager.enabled) }}
       initContainers:
         - name: generate-webhook-certs
           image: alpine/openssl:latest
@@ -104,7 +104,12 @@ spec:
       {{- if .Values.webhook.enabled }}
       volumes:
         - name: webhook-certs
+          {{- if .Values.webhook.certManager.enabled }}
+          secret:
+            secretName: {{ include "minato.fullname" . }}-webhook-server-cert
+          {{- else }}
           emptyDir: {}
+          {{- end }}
       {{- end }}
       {{- with .Values.operator.tolerations }}
       tolerations:
