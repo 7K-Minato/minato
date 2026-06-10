@@ -119,15 +119,32 @@ crds:
 rbac:
   create: true
 
-# Monitoring configuration
+# Monitoring configuration (Prometheus Operator)
 monitoring:
   enabled: false
   serviceMonitor:
     enabled: false
     interval: 30s
+    scrapeTimeout: ""
     labels: {}
+    relabelings: []
+    metricRelabelings: []
   prometheusRule:
     enabled: false
+    labels: {}
+
+# Grafana sidecar configuration
+# Requires Grafana with the dashboard sidecar enabled (grafana-sc-dashboard).
+grafana:
+  enabled: false
+  dashboards:
+    enabled: true
+  sidecar:
+    dashboardLabel: grafana_dashboard
+    dashboardLabelValue: "1"
+    dashboardFolder: ""
+  prometheusRule:
+    enabled: true
     labels: {}
 
 # Webhook configuration

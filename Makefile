@@ -46,6 +46,12 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	"$(CONTROLLER_GEN)" rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(MAKE) helm-crds
+
+.PHONY: helm-crds
+helm-crds: ## Copy CRDs into the Helm chart.
+	mkdir -p chart/files/crds
+	cp config/crd/bases/*.yaml chart/files/crds/
 
 .PHONY: generate
 generate: controller-gen buf-generate ## Generate DeepCopy methods and protobuf code.
@@ -137,12 +143,12 @@ docker-push-all: ## Push all Docker images.
 
 .PHONY: helm-lint
 helm-lint: ## Lint the Helm chart.
-	helm lint deploy/helm/minato
+	helm lint chart
 
 .PHONY: helm-package
 helm-package: ## Package the Helm chart.
 	mkdir -p dist
-	helm package deploy/helm/minato --destination dist/
+	helm package chart --destination dist/
 
 .PHONY: verify
 verify: generate manifests test lint ## Run all verification steps.
