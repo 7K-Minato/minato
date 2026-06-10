@@ -43,6 +43,9 @@ spec:
             - --metrics-bind-address=:{{ .Values.operator.metrics.port }}
           securityContext:
             {{- toYaml .Values.operator.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
           ports:
             - name: metrics
               containerPort: {{ .Values.operator.metrics.port }}
@@ -72,6 +75,9 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      volumes:
+        - name: webhook-certs
+          emptyDir: {}
       {{- with .Values.operator.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
