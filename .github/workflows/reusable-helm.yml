@@ -34,5 +34,5 @@ jobs:
 
       - name: Template Helm chart
         run: |
-          helm template minato deploy/helm/minato --namespace minato > /tmp/minato-rendered.yaml
+          helm template minato chart --namespace minato > /tmp/minato-rendered.yaml
           cat /tmp/minato-rendered.yaml | head -100
