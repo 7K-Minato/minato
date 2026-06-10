@@ -1,0 +1,24 @@
+{{- if .Values.operator.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "minato.fullname" . }}-operator-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    app.kubernetes.io/component: operator
+  {{- with .Values.operator.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.operator.metrics.service.type }}
+  ports:
+    - port: {{ .Values.operator.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "minato.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: operator
+{{- end }}

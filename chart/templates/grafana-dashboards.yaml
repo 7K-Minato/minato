@@ -1,0 +1,49 @@
+{{- if and .Values.grafana.enabled .Values.grafana.dashboards.enabled }}
+{{- $dashboardLabel := .Values.grafana.sidecar.dashboardLabel | default "grafana_dashboard" }}
+{{- $dashboardLabelValue := .Values.grafana.sidecar.dashboardLabelValue | default "1" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "minato.fullname" . }}-grafana-dashboard-overview
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    {{ $dashboardLabel }}: {{ $dashboardLabelValue | quote }}
+    {{- with .Values.grafana.sidecar.dashboardFolder }}
+    grafana_dashboard_folder: {{ . | quote }}
+    {{- end }}
+data:
+  minato-overview.json: |
+    {{ .Files.Get "dashboards/minato-overview.json" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "minato.fullname" . }}-grafana-dashboard-servers
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    {{ $dashboardLabel }}: {{ $dashboardLabelValue | quote }}
+    {{- with .Values.grafana.sidecar.dashboardFolder }}
+    grafana_dashboard_folder: {{ . | quote }}
+    {{- end }}
+data:
+  minato-servers.json: |
+    {{ .Files.Get "dashboards/minato-servers.json" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "minato.fullname" . }}-grafana-dashboard-fleet
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    {{ $dashboardLabel }}: {{ $dashboardLabelValue | quote }}
+    {{- with .Values.grafana.sidecar.dashboardFolder }}
+    grafana_dashboard_folder: {{ . | quote }}
+    {{- end }}
+data:
+  minato-fleet.json: |
+    {{ .Files.Get "dashboards/minato-fleet.json" | nindent 4 }}
+{{- end }}
