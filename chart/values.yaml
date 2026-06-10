@@ -104,6 +104,10 @@ controlPlane:
     port: 8080
     annotations: {}
   
+  env:
+
+  envFrom:
+
   ingress:
     enabled: false
     className: ""
