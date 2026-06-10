@@ -1,5 +1,11 @@
 # Default values for minato.
 
+# Namespace configuration
+# Set to true if the chart should create the namespace (e.g. helm install without ArgoCD).
+# Set to false when ArgoCD or another tool manages namespace creation.
+namespace:
+  create: false
+
 # Operator configuration
 operator:
   enabled: true
