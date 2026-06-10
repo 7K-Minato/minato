@@ -1,0 +1,53 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "minato.fullname" . }}-webhook
+  {{- if .Values.webhook.certManager.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "minato.fullname" . }}-webhook-cert
+  {{- end }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+webhooks:
+  - name: vgameserver.kb.io
+    admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: {{ include "minato.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        path: /validate-operator-minato-io-v1-gameserver
+    failurePolicy: Fail
+    sideEffects: None
+    rules:
+      - apiGroups:
+          - operator.minato.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - gameservers
+  - name: vgameprofile.kb.io
+    admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: {{ include "minato.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        path: /validate-operator-minato-io-v1-gameprofile
+    failurePolicy: Fail
+    sideEffects: None
+    rules:
+      - apiGroups:
+          - operator.minato.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - gameprofiles
+{{- end }}

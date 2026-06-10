@@ -30,6 +30,27 @@ spec:
       serviceAccountName: {{ include "minato.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.operator.securityContext | nindent 8 }}
+      {{- if and .Values.webhook.enabled (not .Values.webhook.certManager.enabled) }}
+      initContainers:
+        - name: generate-webhook-certs
+          image: alpine/openssl:latest
+          command:
+            - sh
+            - -c
+            - |
+              openssl req -x509 -newkey rsa:2048 -keyout /certs/tls.key -out /certs/tls.crt -days 365 -nodes -subj "/CN=minato-webhook" 2>/dev/null
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /certs
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 65532
+      {{- end }}
       containers:
         - name: operator
           image: "{{ .Values.global.imageRegistry }}{{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag }}"
@@ -41,8 +62,16 @@ spec:
             {{- end }}
             - --health-probe-bind-address=:{{ .Values.operator.health.port }}
             - --metrics-bind-address=:{{ .Values.operator.metrics.port }}
+            {{- if not .Values.webhook.enabled }}
+            - --disable-webhooks
+            {{- end }}
           securityContext:
             {{- toYaml .Values.operator.containerSecurityContext | nindent 12 }}
+          {{- if .Values.webhook.enabled }}
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+          {{- end }}
           ports:
             - name: metrics
               containerPort: {{ .Values.operator.metrics.port }}
@@ -71,6 +100,16 @@ spec:
       {{- with .Values.operator.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.webhook.enabled }}
+      volumes:
+        - name: webhook-certs
+          {{- if .Values.webhook.certManager.enabled }}
+          secret:
+            secretName: {{ include "minato.fullname" . }}-webhook-server-cert
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
       {{- end }}
       {{- with .Values.operator.tolerations }}
       tolerations:

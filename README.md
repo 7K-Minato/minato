@@ -129,7 +129,7 @@ spec:
     mountPath: /data
     sizeDefault: 10Gi
   agent:
-    image: "harbor.7kgroup.com/minato-games/minato-agent-minecraft:v0.1.0"
+    image: "harbor.7kgroup.org/7kminato-games/minato-agent-minecraft:v0.1.0"
 ```
 
 ### GameServer (Namespace-scoped)

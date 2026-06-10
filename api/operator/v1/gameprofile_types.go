@@ -105,6 +105,10 @@ type GameProfileSpec struct {
 	// +required
 	Image string `json:"image"`
 
+	// imagePullPolicy is the pull policy for the game container image.
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
 	// ports defines the game ports.
 	// +optional
 	Ports []PortSpec `json:"ports,omitempty"`

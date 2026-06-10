@@ -1,0 +1,16 @@
+{{- if and .Values.webhook.enabled .Values.webhook.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "minato.fullname" . }}-webhook-cert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "minato.fullname" . }}-webhook-server-cert
+  dnsNames:
+    - {{ include "minato.fullname" . }}-webhook.{{ .Release.Namespace }}.svc
+    - {{ include "minato.fullname" . }}-webhook.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    {{- toYaml .Values.webhook.certManager.issuerRef | nindent 4 }}
+{{- end }}

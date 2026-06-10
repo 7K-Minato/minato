@@ -92,7 +92,7 @@ spec:
 All official Minato images are signed with cosign:
 
 ```bash
-cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com harbor.7kgroup.com/minato/minato-operator:v1.0.0
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com harbor.7kgroup.org/7kminato/minato-operator:v1.0.0
 ```
 
 ### Admission Policy
@@ -118,7 +118,7 @@ spec:
           spec:
             containers:
               - name: "*"
-                image: "harbor.7kgroup.com/minato/minato-*"
+                image: "harbor.7kgroup.org/7kminato/minato-*"
 ```
 
 ## Audit Logging
