@@ -11,7 +11,7 @@ operator:
   enabled: true
   image:
     repository: harbor.7kgroup.org/7kminato/minato-operator
-    tag: "1.1.1"
+    tag: "1.2.0"
     pullPolicy: IfNotPresent
   
   replicas: 2
@@ -65,7 +65,7 @@ controlPlane:
   enabled: true
   image:
     repository: harbor.7kgroup.org/7kminato/minato-controlplane
-    tag: "1.1.1"
+    tag: "1.2.0"
     pullPolicy: IfNotPresent
   
   replicas: 2
