@@ -23,6 +23,8 @@ spec:
           port: 8080
         - protocol: TCP
           port: 8081
+        - protocol: TCP
+          port: 9443
   egress:
     {{- toYaml .Values.security.networkPolicy.egress | nindent 4 }}
 {{- end }}
