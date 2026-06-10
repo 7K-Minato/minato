@@ -10,7 +10,7 @@ namespace:
 operator:
   enabled: true
   image:
-    repository: harbor.7kgroup.com/7kminato/minato-operator
+    repository: harbor.7kgroup.org/7kminato/minato-operator
     tag: "v1.1.1"
     pullPolicy: IfNotPresent
   
@@ -64,7 +64,7 @@ operator:
 controlPlane:
   enabled: true
   image:
-    repository: harbor.7kgroup.com/7kminato/minato-controlplane
+    repository: harbor.7kgroup.org/7kminato/minato-controlplane
     tag: "v1.1.1"
     pullPolicy: IfNotPresent
   
