@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/7K-Minato/minato/compare/v1.1.1...v1.2.0) (2026-06-10)
+
+
+### Features
+
+* improve operator helm chart ([#15](https://github.com/7K-Minato/minato/issues/15)) ([7545e6c](https://github.com/7K-Minato/minato/commit/7545e6cb86dc1cac5165831560c98a4125b19844))
+
+
+### Bug Fixes
+
+* solve argocd namespace creation conflict ([#17](https://github.com/7K-Minato/minato/issues/17)) ([ec21e6e](https://github.com/7K-Minato/minato/commit/ec21e6ef5b563e51894f8a63739e2992a856daa1))
+
 ## [1.1.1](https://github.com/7K-Minato/minato/compare/v1.1.0...v1.1.1) (2026-06-09)
 
 
