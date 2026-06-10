@@ -28,9 +28,18 @@ jobs:
         with:
           version: v3.14.0
 
+      - name: Verify CRDs are synced
+        run: |
+          echo "Checking if chart/files/crds/ is in sync with config/crd/bases/..."
+          diff -r config/crd/bases/ chart/files/crds/ || {
+            echo "::error::CRDs are out of sync. Run 'make manifests' to regenerate and copy CRDs into the chart."
+            exit 1
+          }
+          echo "CRDs are in sync."
+
       - name: Lint Helm chart
         run: |
-          helm lint deploy/helm/minato
+          helm lint chart
 
       - name: Template Helm chart
         run: |
