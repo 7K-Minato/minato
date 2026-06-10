@@ -26,12 +26,11 @@
   "helmv3": {
     "enabled": true
   },
-  "regexManagers": [
+  "customManagers": [
     {
-      "fileMatch": ["^.github/workflows/reusable-.*\\.yml$"],
-      "matchStrings": [
-        "uses: (?<depName>[^@]+)@(?<currentValue>[^\\s]+)"
-      ],
+      "customType": "regex",
+      "managerFilePatterns": ["/^.github/workflows/reusable-.*\\.yml$/"],
+      "matchStrings": ["uses: (?<depName>[^@]+)@(?<currentValue>[^\\s]+)"],
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "semver"
     }
