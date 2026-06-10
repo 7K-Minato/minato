@@ -59,11 +59,11 @@ spec:
             timeoutSeconds: 1
           resources:
             {{- toYaml .Values.controlPlane.resources | nindent 12 }}
-          {{- with .Values.env }}
+          {{- with .Values.controlPlane.env }}
           env:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.envFrom }}
+          {{- with .Values.controlPlane.envFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
