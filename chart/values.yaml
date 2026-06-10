@@ -114,6 +114,21 @@ controlPlane:
           - path: /
             pathType: Prefix
     tls: []
+
+  httpRoute:
+    enabled: false
+    parentRefs: []
+    # - name: gateway-name
+    #   namespace: gateway-namespace
+    #   sectionName: https
+    hostnames: []
+    # - minato.example.com
+    rules: []
+    # - matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /
+    #   filters: []
   
   serviceAccount:
     create: true
