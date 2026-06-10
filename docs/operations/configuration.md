@@ -50,7 +50,7 @@ spec:
     sizeDefault: 20Gi
   
   agent:
-    image: "harbor.7kgroup.com/minato-games/minato-agent-minecraft:v0.1.0"
+    image: "harbor.7kgroup.com/7kminato-games/minato-agent-minecraft:v0.1.0"
     version: "0.1.0"
   
   actions:
@@ -155,7 +155,7 @@ storage:
 
 ```yaml
 agent:
-  image: "harbor.7kgroup.com/minato-games/minato-agent-minecraft:v0.1.0"
+  image: "harbor.7kgroup.com/7kminato-games/minato-agent-minecraft:v0.1.0"
   version: "0.1.0"
 ```
 
@@ -416,7 +416,7 @@ spec:
     mountPath: /data
     sizeDefault: 20Gi
   agent:
-    image: "harbor.7kgroup.com/minato-games/minato-agent-minecraft:v0.1.0"
+    image: "harbor.7kgroup.com/7kminato-games/minato-agent-minecraft:v0.1.0"
     version: "0.1.0"
 ```
 
@@ -446,7 +446,7 @@ spec:
     mountPath: /home/steam/cs2-dedicated
     sizeDefault: 50Gi
   agent:
-    image: "harbor.7kgroup.com/minato-games/minato-agent-cs2:v0.1.0"
+    image: "harbor.7kgroup.com/7kminato-games/minato-agent-cs2:v0.1.0"
     version: "0.1.0"
 ```
 
@@ -480,6 +480,6 @@ spec:
     mountPath: /palworld
     sizeDefault: 20Gi
   agent:
-    image: "harbor.7kgroup.com/minato-games/minato-agent-palworld:v0.1.0"
+    image: "harbor.7kgroup.com/7kminato-games/minato-agent-palworld:v0.1.0"
     version: "0.1.0"
 ```

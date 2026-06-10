@@ -10,8 +10,8 @@ namespace:
 operator:
   enabled: true
   image:
-    repository: harbor.7kgroup.com/minato/minato-operator
-    tag: "v1.0.0"
+    repository: harbor.7kgroup.com/7kminato/minato-operator
+    tag: "v1.1.1"
     pullPolicy: IfNotPresent
   
   replicas: 2
@@ -64,8 +64,8 @@ operator:
 controlPlane:
   enabled: true
   image:
-    repository: harbor.7kgroup.com/minato/minato-controlplane
-    tag: "v1.0.0"
+    repository: harbor.7kgroup.com/7kminato/minato-controlplane
+    tag: "v1.1.1"
     pullPolicy: IfNotPresent
   
   replicas: 2
