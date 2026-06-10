@@ -12,7 +12,7 @@ This document maps Minato controls to common compliance frameworks.
 - NetworkPolicies restrict pod-to-pod communication
 
 **Evidence:**
-- `config/rbac/tenant/` contains tenant role definitions
+- `chart/templates/rbac.yaml` contains RBAC definitions
 - `docs/operations/multi-tenancy.md` documents isolation model
 
 ### CC6.2 - Prior to Access
@@ -48,7 +48,7 @@ This document maps Minato controls to common compliance frameworks.
 ### A.9.1.1 - Access Control Policy
 
 **Minato Implementation:**
-- Documented RBAC policy in `config/rbac/`
+- Documented RBAC policy in `chart/templates/rbac.yaml`
 - Three-tier tenant model (viewer, operator, admin)
 - Platform admin role for cluster-wide management
 

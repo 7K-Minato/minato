@@ -55,9 +55,8 @@ make build
 # Install CRDs
 kubectl apply -f config/crd/bases/
 
-# Deploy operator
-kubectl apply -f config/manager/
-kubectl apply -f config/rbac/
+# Deploy operator (via Helm)
+make deploy
 ```
 
 ## Configuration
