@@ -117,6 +117,7 @@ controlPlane:
 
   httpRoute:
     enabled: false
+    annotations: {}
     parentRefs: []
     # - name: gateway-name
     #   namespace: gateway-namespace

@@ -7,6 +7,10 @@ metadata:
   labels:
     {{- include "minato.labels" . | nindent 4 }}
     app.kubernetes.io/component: controlplane
+  {{- with .Values.controlPlane.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   parentRefs:
     {{- toYaml .Values.controlPlane.httpRoute.parentRefs | nindent 4 }}
