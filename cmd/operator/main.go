@@ -3,7 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
+	"path/filepath"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -212,7 +215,16 @@ func main() {
 		setupLog.Error(err, "Failed to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+
+	readinessChecks := []healthz.Checker{healthz.Ping}
+	if !disableWebhooks {
+		certDir := webhookCertPath
+		if certDir == "" {
+			certDir = "/tmp/k8s-webhook-server/serving-certs"
+		}
+		readinessChecks = append(readinessChecks, webhookCertReadinessChecker(certDir, webhookCertName))
+	}
+	if err := mgr.AddReadyzCheck("readyz", combineReadinessChecks(readinessChecks...)); err != nil {
 		setupLog.Error(err, "Failed to set up ready check")
 		os.Exit(1)
 	}
@@ -221,5 +233,26 @@ func main() {
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "Failed to run manager")
 		os.Exit(1)
+	}
+}
+
+func combineReadinessChecks(checkers ...healthz.Checker) healthz.Checker {
+	return func(req *http.Request) error {
+		for _, checker := range checkers {
+			if err := checker(req); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func webhookCertReadinessChecker(certDir, certName string) healthz.Checker {
+	certPath := filepath.Join(certDir, certName)
+	return func(_ *http.Request) error {
+		if _, err := os.Stat(certPath); err != nil {
+			return fmt.Errorf("webhook certificate not ready at %s: %w", certPath, err)
+		}
+		return nil
 	}
 }

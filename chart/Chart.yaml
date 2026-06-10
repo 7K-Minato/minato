@@ -2,8 +2,8 @@ apiVersion: v2
 name: minato
 description: Minato - Kubernetes-native platform for persistent, multi-game dedicated game servers
 type: application
-version: 1.0.0
-appVersion: "1.0.0"
+version: 1.2.0
+appVersion: "1.2.0"
 keywords:
   - gameserver
   - minecraft

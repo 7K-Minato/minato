@@ -31,8 +31,10 @@ spec:
         {{- toYaml .Values.controlPlane.securityContext | nindent 8 }}
       containers:
         - name: controlplane
-          image: "{{ .Values.global.imageRegistry }}{{ .Values.controlPlane.image.repository }}:{{ .Values.controlPlane.image.tag }}"
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.controlPlane.image.repository }}:{{ .Values.controlPlane.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.controlPlane.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.controlPlane.containerSecurityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.controlPlane.service.port }}
@@ -41,14 +43,20 @@ spec:
             httpGet:
               path: /healthz
               port: http
+              scheme: HTTP
             initialDelaySeconds: 15
             periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 1
           readinessProbe:
             httpGet:
               path: /readyz
               port: http
+              scheme: HTTP
             initialDelaySeconds: 5
             periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 1
           resources:
             {{- toYaml .Values.controlPlane.resources | nindent 12 }}
       {{- with .Values.controlPlane.nodeSelector }}

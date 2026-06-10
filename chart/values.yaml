@@ -1,5 +1,11 @@
 # Default values for minato.
 
+# Override the fully qualified app name.
+# Set this to avoid double suffixes when the Helm release name already contains
+# the chart name (e.g. release name "minato-operator" would otherwise produce
+# deployment names like "minato-operator-operator").
+fullnameOverride: ""
+
 # Namespace configuration
 # Set to true if the chart should create the namespace (e.g. helm install without ArgoCD).
 # Set to false when ArgoCD or another tool manages namespace creation.
@@ -11,7 +17,8 @@ operator:
   enabled: true
   image:
     repository: harbor.7kgroup.org/7kminato/minato-operator
-    tag: "1.2.0"
+    # If empty, defaults to .Chart.AppVersion. Override to pin to a specific image tag.
+    tag: ""
     pullPolicy: IfNotPresent
   
   replicas: 2
@@ -65,7 +72,8 @@ controlPlane:
   enabled: true
   image:
     repository: harbor.7kgroup.org/7kminato/minato-controlplane
-    tag: "1.2.0"
+    # If empty, defaults to .Chart.AppVersion. Override to pin to a specific image tag.
+    tag: ""
     pullPolicy: IfNotPresent
   
   replicas: 2
@@ -155,10 +163,22 @@ grafana:
 
 # Webhook configuration
 webhook:
+  # Set to true to enable validating admission webhooks.
+  # When enabled, you MUST also either:
+  #   a) enable certManager and provide a valid issuerRef, or
+  #   b) leave certManager disabled and the chart will generate self-signed certs
+  #      via an initContainer (suitable for dev/test only).
   enabled: false
   certManager:
     enabled: false
     issuerRef: {}
+  # Init container image used to generate self-signed webhook certs when
+  # certManager is disabled. Pinned to a digest for reproducibility.
+  certgen:
+    image:
+      repository: alpine/openssl
+      tag: "3.21.3"
+      pullPolicy: IfNotPresent
 
 # Security configuration
 security:

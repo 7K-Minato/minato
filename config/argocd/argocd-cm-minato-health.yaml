@@ -1,0 +1,127 @@
+# ArgoCD ConfigMap patch for minato CRD health checks.
+# Apply with: kubectl apply -n argocd -f argocd-cm-minato-health.yaml
+#
+# NOTE: This patches the argocd-cm ConfigMap. If argocd-cm is already
+# managed by ArgoCD (e.g. via app-of-apps self-management), include this
+# ConfigMap as a resource in that Application instead of applying manually.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  resource.customizations.health.operator.minato.io_GameServer: |
+    hs = {}
+    if obj.status ~= nil then
+      if obj.status.state == "Running" then
+        hs.status = "Healthy"
+        hs.message = "GameServer is running"
+      elseif obj.status.state == "Error" then
+        hs.status = "Degraded"
+        hs.message = "GameServer is in error state"
+      elseif obj.status.state == "Provisioning" or obj.status.state == "Idle" or obj.status.state == "Stopped" then
+        hs.status = "Progressing"
+        hs.message = "GameServer state: " .. obj.status.state
+      else
+        hs.status = "Progressing"
+        hs.message = "Waiting for GameServer state"
+      end
+
+      if obj.status.conditions ~= nil then
+        for i, condition in ipairs(obj.status.conditions) do
+          if condition.type == "Ready" and condition.status == "False" then
+            hs.status = "Progressing"
+            hs.message = "Not Ready: " .. (condition.message or "")
+          end
+          if condition.type == "Ready" and condition.status == "True" and hs.status == "Progressing" then
+            hs.status = "Healthy"
+            hs.message = "GameServer is ready"
+          end
+        end
+      end
+    else
+      hs.status = "Progressing"
+      hs.message = "Waiting for GameServer status"
+    end
+    return hs
+
+  resource.customizations.health.operator.minato.io_GameServerFleet: |
+    hs = {}
+    if obj.status ~= nil then
+      ready = obj.status.readyReplicas or 0
+      desired = obj.spec.replicas or 0
+      if ready == desired and desired > 0 then
+        hs.status = "Healthy"
+        hs.message = ready .. "/" .. desired .. " replicas ready"
+      else
+        hs.status = "Progressing"
+        hs.message = ready .. "/" .. desired .. " replicas ready"
+      end
+    else
+      hs.status = "Progressing"
+      hs.message = "Waiting for GameServerFleet status"
+    end
+    return hs
+
+  resource.customizations.health.operator.minato.io_GameProfile: |
+    hs = {}
+    if obj.status ~= nil and obj.status.conditions ~= nil then
+      for i, condition in ipairs(obj.status.conditions) do
+        if condition.type == "Ready" and condition.status == "True" then
+          hs.status = "Healthy"
+          hs.message = "GameProfile is ready"
+          return hs
+        end
+        if condition.type == "Ready" and condition.status == "False" then
+          hs.status = "Degraded"
+          hs.message = condition.message or "GameProfile not ready"
+          return hs
+        end
+      end
+    end
+    hs.status = "Healthy"
+    hs.message = "GameProfile exists"
+    return hs
+
+  resource.customizations.health.operator.minato.io_GameSnapshot: |
+    hs = {}
+    if obj.status ~= nil and obj.status.conditions ~= nil then
+      for i, condition in ipairs(obj.status.conditions) do
+        if condition.type == "Ready" and condition.status == "True" then
+          hs.status = "Healthy"
+          hs.message = "GameSnapshot is ready"
+          return hs
+        end
+        if condition.type == "Ready" and condition.status == "False" then
+          hs.status = "Progressing"
+          hs.message = condition.message or "GameSnapshot not ready"
+          return hs
+        end
+      end
+    end
+    hs.status = "Progressing"
+    hs.message = "Waiting for GameSnapshot status"
+    return hs
+
+  resource.customizations.health.operator.minato.io_ActionExecution: |
+    hs = {}
+    if obj.status ~= nil then
+      state = obj.status.state or "Pending"
+      if state == "Succeeded" then
+        hs.status = "Healthy"
+        hs.message = "Action execution succeeded"
+      elseif state == "Failed" or state == "TimedOut" or state == "Rejected" then
+        hs.status = "Degraded"
+        hs.message = "Action execution " .. state
+      else
+        hs.status = "Progressing"
+        hs.message = "Action execution state: " .. state
+      end
+    else
+      hs.status = "Progressing"
+      hs.message = "Waiting for ActionExecution status"
+    end
+    return hs
