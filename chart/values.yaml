@@ -209,6 +209,14 @@ security:
   
   networkPolicy:
     enabled: true
+    # Extra namespaces allowed to reach Minato pods on the control-plane ports.
+    # Each entry needs a namespace and a list of ports.
+    # Example:
+    #   ingress:
+    #     - namespace: istio
+    #       ports:
+    #         - protocol: TCP
+    #           port: 8080
     ingress: []
     egress:
       - to: []
