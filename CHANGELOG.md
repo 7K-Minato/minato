@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1](https://github.com/7K-Minato/minato/compare/v1.2.0...v1.2.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* **chart,operator,ci:** installation and observability improvements ([#19](https://github.com/7K-Minato/minato/issues/19)) ([7a2685f](https://github.com/7K-Minato/minato/commit/7a2685fbbdb404521f49312a694c94c81d4a5ff3))
+* **chart:** bump operator and controlplane images to v1.2.0 ([4504e04](https://github.com/7K-Minato/minato/commit/4504e04d6d2293e3d39f9dbb3e23b0be2a9a423a))
+
 ## [1.2.0](https://github.com/7K-Minato/minato/compare/v1.1.1...v1.2.0) (2026-06-10)
 
 
