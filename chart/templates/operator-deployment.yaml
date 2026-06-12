@@ -33,7 +33,8 @@ spec:
       {{- if and .Values.webhook.enabled (not .Values.webhook.certManager.enabled) }}
       initContainers:
         - name: generate-webhook-certs
-          image: alpine/openssl:latest
+          image: "{{ .Values.webhook.certgen.image.repository }}:{{ .Values.webhook.certgen.image.tag }}"
+          imagePullPolicy: {{ .Values.webhook.certgen.image.pullPolicy }}
           command:
             - sh
             - -c
@@ -53,7 +54,7 @@ spec:
       {{- end }}
       containers:
         - name: operator
-          image: "{{ .Values.global.imageRegistry }}{{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag }}"
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
           args:
             - /manager
@@ -83,14 +84,20 @@ spec:
             httpGet:
               path: /healthz
               port: health
+              scheme: HTTP
             initialDelaySeconds: 15
             periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 1
           readinessProbe:
             httpGet:
               path: /readyz
               port: health
+              scheme: HTTP
             initialDelaySeconds: 5
             periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 1
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}
       {{- with .Values.operator.nodeSelector }}

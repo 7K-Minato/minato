@@ -223,12 +223,19 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
+      - name: Update chart version and appVersion
+        run: |
+          CHART_VERSION=${{ needs.release-please.outputs.version }}
+          sed -i "s/^version:.*/version: ${CHART_VERSION}/" chart/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${CHART_VERSION}\"/" chart/Chart.yaml
+          cat chart/Chart.yaml
+
       - name: Package Helm chart
         id: package
         run: |
           CHART_VERSION=${{ needs.release-please.outputs.version }}
-          helm package deploy/helm/minato --version "$CHART_VERSION" --destination .cr-release-packages
-          CHART_NAME=$(awk '/^name:/ {print $2; exit}' deploy/helm/minato/Chart.yaml)
+          helm package chart --version "$CHART_VERSION" --destination .cr-release-packages
+          CHART_NAME=$(awk '/^name:/ {print $2; exit}' chart/Chart.yaml)
           PACKAGE="${CHART_NAME}-${CHART_VERSION}.tgz"
           test -f ".cr-release-packages/${PACKAGE}"
           echo "name=${CHART_NAME}" >> "$GITHUB_OUTPUT"

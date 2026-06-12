@@ -23,6 +23,10 @@ spec:
           port: 8080
         - protocol: TCP
           port: 8081
+    # Webhook must be reachable from the Kubernetes API server
+    - ports:
+        - protocol: TCP
+          port: 9443
   egress:
     {{- toYaml .Values.security.networkPolicy.egress | nindent 4 }}
 {{- end }}
