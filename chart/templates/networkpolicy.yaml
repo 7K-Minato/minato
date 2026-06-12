@@ -23,6 +23,17 @@ spec:
           port: 8080
         - protocol: TCP
           port: 8081
+    {{- range .Values.security.networkPolicy.ingress }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace | quote }}
+      ports:
+        {{- range .ports }}
+        - protocol: {{ .protocol | default "TCP" }}
+          port: {{ .port }}
+        {{- end }}
+    {{- end }}
     # Webhook must be reachable from the Kubernetes API server
     - ports:
         - protocol: TCP
