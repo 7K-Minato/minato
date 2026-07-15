@@ -19,6 +19,7 @@ kubectl get events -n minato --field-selector reason=FailedBinding
 Symptom: `no persistent volumes available for this claim`
 
 Solution: Check and configure StorageClass:
+
 ```bash
 kubectl get storageclass
 # If none, install a provisioner (e.g., Longhorn, Rook-Ceph)
@@ -27,6 +28,7 @@ kubectl get storageclass
 ### StorageClass Not Set as Default
 
 Solution: Mark StorageClass as default:
+
 ```bash
 kubectl patch storageclass STORAGE_CLASS_NAME -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 ```
@@ -36,6 +38,7 @@ kubectl patch storageclass STORAGE_CLASS_NAME -p '{"metadata":{"annotations":{"s
 Symptom: `exceeded quota`
 
 Solution: Check ResourceQuota:
+
 ```bash
 kubectl get resourcequota -n minato
 kubectl describe resourcequota -n minato
@@ -44,12 +47,14 @@ kubectl describe resourcequota -n minato
 ## Recovery
 
 1. If PVC is stuck, delete and recreate:
+
 ```bash
 kubectl delete pvc -n minato PVC_NAME
 # The StatefulSet will recreate it
 ```
 
-2. Pre-provision PV manually:
+1. Pre-provision PV manually:
+
 ```yaml
 apiVersion: v1
 kind: PersistentVolume

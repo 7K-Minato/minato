@@ -22,6 +22,7 @@ As minato scales to support larger games (MMOs, massive SMP servers), a single G
 > **Sharding is a deployment pattern, not a game mechanic.**
 
 The operator provides infrastructure for sharding. The game/agent decides what a "shard" means:
+
 - **Minecraft:** A shard could be a server in a BungeeCord/Velocity network
 - **MMO:** A shard could be a geographic zone (EU-1, US-West-1)
 - **FPS:** A shard could be a match instance (each match = one shard)
@@ -35,7 +36,7 @@ The operator **never** implements game-specific sharding logic (no "shard map", 
 
 ### Use Case 1: Minecraft Server Network (BungeeCord/Velocity)
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │           Proxy (BungeeCord)            │
 │  - Routes players to shards             │
@@ -56,7 +57,7 @@ The operator **never** implements game-specific sharding logic (no "shard map", 
 
 ### Use Case 2: MMO Zone Sharding
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │           Game World (10k players)      │
 │                                         │
@@ -74,7 +75,7 @@ The operator **never** implements game-specific sharding logic (no "shard map", 
 
 ### Use Case 3: Match-Based Games (CS2, Valorant-style)
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │           Matchmaker Service            │
 │  - Creates match = 1 shard              │
@@ -99,6 +100,7 @@ The operator **never** implements game-specific sharding logic (no "shard map", 
 ### Option A: Fleet as Shard Controller (What we almost built)
 
 Add `shardMode` to GameServerFleet. When enabled:
+
 - Each GameServer gets `SHARD_ID`, `SHARD_COUNT` env vars
 - A ConfigMap is created with shard topology (addresses of all shards)
 - The game/agent reads the ConfigMap to discover other shards
@@ -119,11 +121,13 @@ spec:
 ```
 
 **Pros:**
+
 - Simple: One field enables sharding
 - Game-agnostic: Just injects env vars and ConfigMap
 - Works with any game that can read env vars
 
 **Cons:**
+
 - Limited: Only provides static topology. No dynamic shard creation.
 - Doesn't handle proxy deployment (BungeeCord is a separate GameServer)
 - Shard identity is tied to fleet index (shard-1, shard-2...), not game concepts ("EU-West", "Lobby")
@@ -157,11 +161,13 @@ spec:
 The GameServerShard controller creates the underlying GameServer with the shard identity.
 
 **Pros:**
+
 - Flexible: Shards can have different configs (one is lobby, one is survival)
 - Game-defined identity: Shard ID is meaningful ("EU-West", "Lobby")
 - Can be created/deleted independently (for match-based games)
 
 **Cons:**
+
 - More complex: New CRD, new controller
 - User must manage shard lifecycle explicitly
 - Overlap with GameServerFleet (both create GameServers)
@@ -210,11 +216,13 @@ spec:
 ```
 
 **Pros:**
+
 - Complete solution: Proxy + shards + shared services in one manifest
 - Game-agnostic: Just defines topology, no game logic
 - GitOps-friendly: One YAML = entire game network
 
 **Cons:**
+
 - Very complex: New CRD, lots of controllers
 - Shared services (Redis, MySQL) are outside minato scope — how do we manage them?
 - Over-engineered for simple use cases (one shard = one GameServerFleet)
@@ -228,7 +236,7 @@ spec:
 1. **Current Fleet is sufficient for 80% of cases:** Most games need 1-3 servers, not 100 shards
 2. **Sharding is game-specific:** What works for Minecraft (BungeeCord) doesn't work for an MMO (zone-based)
 3. **Agent/SDK can handle it:** The agent gRPC API can expose shard topology to the game. The game decides what to do with it.
-4. ** premature optimization:** We don't have users asking for 10,000-player worlds yet
+4. **premature optimization:** We don't have users asking for 10,000-player worlds yet
 
 **Instead, enhance the existing Fleet with shard-friendly features:**
 
@@ -315,7 +323,7 @@ When we have a real use case (e.g., a customer running a 5,000-player MMO), then
 ## Related Concepts
 
 | Concept | minato Approach |
-|---------|----------------|
+| --------- | ---------------- |
 | **Shard** | One GameServer in a Fleet |
 | **Shard Group** | One GameServerFleet |
 | **Shard Identity** | Pod name (`fleet-0`, `fleet-1`) or env var |

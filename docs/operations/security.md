@@ -17,6 +17,7 @@ All Minato components run under the `restricted` Pod Security Standard:
 ### Inter-Component Communication
 
 All inter-component traffic should be encrypted:
+
 - Operator → Agent: mTLS via cert-manager-issued certificates (Phase 2)
 - Control Plane → Operator: Via Kubernetes API with TLS
 - Client → Control Plane: HTTPS/TLS
@@ -24,6 +25,7 @@ All inter-component traffic should be encrypted:
 ### Network Policies
 
 Default NetworkPolicy:
+
 - Ingress: Only from within the same namespace
 - Egress: Allowed to Kubernetes API (443, 6443)
 - Game server ports are exposed via Services with proper selectors
@@ -34,7 +36,7 @@ Default NetworkPolicy:
 
 The control plane uses Kubernetes tokens for authentication:
 
-```
+```text
 Authorization: Bearer <k8s-token>
 ```
 
@@ -43,6 +45,7 @@ Tokens are validated via TokenReview API.
 ### RBAC
 
 Three tenant roles are provided:
+
 - `minato:tenant-viewer`: Read-only access
 - `minato:tenant-operator`: Can manage GameServers and execute actions
 - `minato:tenant-admin`: Full namespace access including NetworkPolicies
@@ -143,7 +146,7 @@ Every state-changing operation is logged:
 ## Compliance Mapping
 
 | Control | Implementation |
-|---------|---------------|
+| --------- | --------------- |
 | SOC 2 CC6.1 | Logical access controls via RBAC |
 | SOC 2 CC6.2 | Authentication via Kubernetes tokens |
 | SOC 2 CC6.3 | Authorization via RBAC roles |

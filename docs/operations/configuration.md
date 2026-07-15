@@ -6,7 +6,7 @@ This document provides a comprehensive reference for configuring Minato resource
 
 A `GameProfile` defines a reusable game configuration.
 
-### Full Example
+### Full GameProfile Example
 
 ```yaml
 apiVersion: operator.minato.io/v1
@@ -74,10 +74,10 @@ spec:
     restoreFromSnapshot: true
 ```
 
-### Field Reference
+### GameProfile Field Reference
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `displayName` | string | Yes | Human-friendly name |
 | `image` | string | Yes | Game container image |
 | `imagePullPolicy` | string | No | Image pull policy (Always/IfNotPresent/Never) |
@@ -100,13 +100,13 @@ capabilities:
 ```
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `files` | bool | No | Inject filebrowser sidecar |
 | `sftp` | bool | No | Inject SFTP sidecar |
 | `backup` | bool | No | Enable backup action |
 | `restoreFromSnapshot` | bool | No | Enable restore from snapshot |
 
-## GameServer
+## GameProfile Spec Types
 
 ### PortSpec
 
@@ -118,7 +118,7 @@ ports:
 ```
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `name` | string | Yes | Port name |
 | `containerPort` | int32 | Yes | Container port |
 | `protocol` | string | No | TCP or UDP (default: TCP) |
@@ -133,7 +133,7 @@ environment:
 ```
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `key` | string | Yes | Environment variable name |
 | `default` | string | No | Default value |
 | `required` | bool | No | Whether user must provide a value |
@@ -147,7 +147,7 @@ storage:
 ```
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `mountPath` | string | Yes | Volume mount path |
 | `sizeDefault` | string | Yes | Default PVC size |
 
@@ -160,7 +160,7 @@ agent:
 ```
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `image` | string | Yes | Agent container image |
 | `version` | string | Yes | Agent version for compatibility |
 
@@ -180,28 +180,18 @@ actions:
 ```
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `name` | string | Yes | Action identifier |
 | `description` | string | No | Human-readable description |
 | `params` | map[string]ActionParamSchema | No | Parameter schema |
 | `concurrency` | string | No | allow/serialize/exclusive |
 | `timeout` | string | No | Maximum duration |
 
-### CapabilitiesSpec
-
-```yaml
-capabilities:
-  files: true      # Filebrowser sidecar
-  sftp: true       # SFTP sidecar
-  backup: true     # Supports backup action
-  restoreFromSnapshot: true
-```
-
 ## GameServer
 
 A `GameServer` represents a single running game server instance.
 
-### Full Example
+### Full GameServer Example
 
 ```yaml
 apiVersion: operator.minato.io/v1
@@ -219,10 +209,10 @@ spec:
     autoStart: true
 ```
 
-### Field Reference
+### GameServer Field Reference
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `profile` | string | Yes | GameProfile name |
 | `env` | map[string]string | No | Environment overrides |
 | `lifecycle` | LifecycleSpec | No | Lifecycle settings |
@@ -236,7 +226,7 @@ lifecycle:
 ```
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `idleTimeoutSeconds` | int32 | No | Auto-shutdown timeout (0 = disabled) |
 | `autoStart` | bool | No | Start automatically on creation |
 
@@ -244,7 +234,7 @@ lifecycle:
 
 A `GameServerFleet` manages multiple GameServers of the same profile.
 
-### Full Example
+### Full GameServerFleet Example
 
 ```yaml
 apiVersion: operator.minato.io/v1
@@ -269,10 +259,10 @@ spec:
       maxSurge: 1
 ```
 
-### Field Reference
+### GameServerFleet Field Reference
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `profile` | string | Yes | GameProfile name |
 | `replicas` | int32 | Yes | Number of GameServers |
 | `template` | GameServerTemplateSpec | No | Template for created GameServers |
@@ -281,7 +271,7 @@ spec:
 ### UpdateStrategy
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `type` | string | No | RollingUpdate or OnDelete |
 | `rollingUpdate` | RollingUpdateConfig | No | Rolling update parameters |
 
@@ -289,7 +279,7 @@ spec:
 
 An `ActionExecution` dispatches an action to a game server.
 
-### Example
+### ActionExecution Example
 
 ```yaml
 apiVersion: operator.minato.io/v1
@@ -308,10 +298,10 @@ spec:
   caller: "admin"
 ```
 
-### Field Reference
+### ActionExecution Field Reference
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `targetRef` | TargetRef | Yes | Target GameServer or Fleet |
 | `actionName` | string | Yes | Action to execute |
 | `params` | map[string]string | No | Action parameters |
@@ -321,7 +311,7 @@ spec:
 
 A `GameSnapshot` manages backups of game server data.
 
-### Example
+### GameSnapshot Example
 
 ```yaml
 apiVersion: operator.minato.io/v1
@@ -337,10 +327,10 @@ spec:
     duration: "168h"
 ```
 
-### Field Reference
+### GameSnapshot Field Reference
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `gameServerRef` | string | Yes | GameServer name |
 | `schedule` | string | No | Cron expression for periodic snapshots |
 | `retention` | SnapshotRetention | No | Retention policy |
@@ -348,7 +338,7 @@ spec:
 ### SnapshotRetention
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `count` | int | No | Maximum number of snapshots |
 | `duration` | string | No | Maximum age (e.g., "168h") |
 
@@ -357,7 +347,7 @@ spec:
 ### Operator
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `METRICS_BIND_ADDRESS` | `0` | Metrics endpoint address |
 | `HEALTH_PROBE_BIND_ADDRESS` | `:8081` | Health probe address |
 | `LEADER_ELECT` | `true` | Enable leader election |
@@ -365,7 +355,7 @@ spec:
 ### Agent
 
 | Variable | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | `MINATO_GAMESERVER_NAME` | GameServer name |
 | `MINATO_GAMESERVER_NAMESPACE` | GameServer namespace |
 | `MINATO_GAME_CONTAINER` | Game container name |
@@ -376,7 +366,7 @@ spec:
 ### Control Plane
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| --- | --- | --- |
 | `PORT` | `8080` | HTTP server port |
 
 ## Common Configurations

@@ -114,6 +114,7 @@ kubectl create rolebinding tenant-alpha-operator \
 ## Cross-Tenant Visibility
 
 By default, tenants cannot:
+
 - List GameServers in other namespaces
 - View ActionExecutions in other namespaces
 - Access agent gRPC endpoints in other namespaces

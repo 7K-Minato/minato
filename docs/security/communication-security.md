@@ -5,7 +5,7 @@
 ### What We're Protecting
 
 | Asset | Threat | Impact |
-|-------|--------|--------|
+| ------- | -------- | -------- |
 | **Control Plane API** | Unauthorized access, MITM | Attacker can execute actions on any game server |
 | **Agent gRPC** | Unauthorized calls, eavesdropping | Attacker can shutdown servers, steal player data |
 | **Game Server State** | Tampering, DoS | Player data loss, service disruption |
@@ -14,7 +14,7 @@
 ### What We Are NOT Protecting
 
 | Asset | Reason |
-|-------|--------|
+| --- | --- |
 | **Player → Game traffic** | Game protocols (Minecraft, CS2, etc.) use raw TCP/UDP. Encryption would break game clients. DDoS protection must happen at the network edge. |
 | **Agent → Game RCON** | RCON protocols (Source, Minecraft) don't support TLS. This is a protocol limitation we cannot fix. |
 
@@ -22,7 +22,7 @@
 
 ## Defense in Depth Strategy
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        EXTERNAL ACCESS                               │
 │                                                                     │
@@ -136,18 +136,21 @@ In strict mode, each GameServer gets its own NetworkPolicy preventing lateral mo
 ### Why No Built-in TLS?
 
 minato is designed to be agnostic of the cluster's networking stack. Many production clusters already have:
+
 - **Service mesh** (Istio, Linkerd, Cilium) providing transparent mTLS
 - **CNI plugins** with built-in encryption (WireGuard, IPsec)
 - **NetworkPolicies** restricting pod-to-pod traffic
 
 Adding application-level mTLS would:
+
 - Conflict with service mesh double-encryption
 - Add complexity for simple deployments
 - Force a specific certificate management strategy
 
-### Current State
+### Agent gRPC Current State
 
 Agent gRPC runs on plaintext. This is acceptable when:
+
 - The cluster uses a service mesh with mTLS
 - NetworkPolicies restrict agent port access to the control plane namespace
 - The cluster CNI encrypts pod-to-pod traffic
@@ -155,7 +158,7 @@ Agent gRPC runs on plaintext. This is acceptable when:
 ### Recommendations for Production
 
 | Strategy | Implementation | minato Role |
-|----------|---------------|-------------|
+| ---------- | --------------- | ------------- |
 | **Service mesh mTLS** | Configure Istio/Linkerd/Cilium | Document integration |
 | **CNI encryption** | Enable WireGuard/IPsec in Cilium/Calico | None — works transparently |
 | **NetworkPolicy** | Restrict agent port to control plane namespace | Provide templates in game charts |
@@ -214,6 +217,7 @@ The control plane serves HTTPS directly. Useful when ingress is not available.
 ### minato Recommendation
 
 **Use Ingress TLS.** The control plane is an internal service that should not be exposed directly to the internet. An ingress controller (nginx, traefik, etc.) provides:
+
 - TLS termination
 - Rate limiting
 - WAF integration
@@ -225,7 +229,7 @@ The control plane serves HTTPS directly. Useful when ingress is not available.
 
 **Responsibility:** minato generates strong passwords; cluster admin ensures they're not logged.
 
-### Current State
+### RCON Current State
 
 RCON is a plaintext protocol. We cannot add TLS without breaking game compatibility.
 
@@ -274,7 +278,7 @@ Deploy a separate TLS-terminating RCON proxy (e.g., stunnel) that forwards to lo
 
 **Responsibility:** Kubernetes; minato uses least-privilege SA.
 
-### Current State
+### Service Account Current State
 
 All pods use the default service account.
 
@@ -371,7 +375,7 @@ security:
 ## What minato Does vs. What Cluster Admin Does
 
 | Concern | minato | Cluster Admin |
-|---------|--------|---------------|
+| --------- | -------- | --------------- |
 | **NetworkPolicy** | ❌ (game-specific, belongs in charts) | ✅ Game charts define policies; CNI enforces them |
 | **Agent gRPC mTLS** | ✅ Implements TLS in code | ✅ Provides cert-manager or CA |
 | **Control plane TLS** | ✅ Supports HTTPS mode | ✅ Provides certificates or ingress |

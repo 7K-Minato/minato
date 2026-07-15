@@ -7,7 +7,7 @@ This document defines the standard metric schema for Minato components.
 All operator metrics are prefixed with `minato_operator_`.
 
 | Metric Name | Type | Labels | Description |
-|------------|------|--------|-------------|
+| ------------ | ------ | -------- | ------------- |
 | `minato_operator_reconciliations_total` | Counter | `controller`, `result` | Total number of reconciliations |
 | `minato_gameservers` | Gauge | `state`, `profile`, `namespace` | Number of GameServers by state |
 | `minato_action_executions_total` | Counter | `action`, `profile`, `result` | Total ActionExecutions |
@@ -20,7 +20,7 @@ All operator metrics are prefixed with `minato_operator_`.
 All agent metrics are prefixed with `minato_agent_`.
 
 | Metric Name | Type | Labels | Description |
-|------------|------|--------|-------------|
+| ------------ | ------ | -------- | ------------- |
 | `minato_agent_info` | Gauge | `game`, `version` | Agent info (always 1) |
 | `minato_agent_uptime_seconds` | Gauge | `game`, `server` | Agent uptime |
 | `minato_players_online` | Gauge | `game`, `server` | Current player count |
@@ -78,6 +78,7 @@ minato_players_online / minato_player_capacity > 0.8
 Agent metrics are scraped via ServiceMonitors created by a separate Helm chart (not the operator). The operator does not create ServiceMonitors directly.
 
 To enable metrics scraping:
+
 1. Install the Prometheus Operator in your cluster
 2. Deploy the minato-monitoring Helm chart (or create ServiceMonitors manually)
 3. Agents expose `/metrics` on port 9090 by default

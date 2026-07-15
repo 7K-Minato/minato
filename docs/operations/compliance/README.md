@@ -7,17 +7,20 @@ This document maps Minato controls to common compliance frameworks.
 ### CC6.1 - Logical and Physical Access Controls
 
 **Minato Implementation:**
+
 - RBAC-based access control for all resources
 - Namespace isolation for multi-tenant deployments
 - NetworkPolicies restrict pod-to-pod communication
 
 **Evidence:**
+
 - `chart/templates/rbac.yaml` contains RBAC definitions
 - `docs/operations/multi-tenancy.md` documents isolation model
 
 ### CC6.2 - Prior to Access
 
 **Minato Implementation:**
+
 - Kubernetes token-based authentication
 - TokenReview API validates all requests
 - OIDC integration supported via Kubernetes
@@ -25,6 +28,7 @@ This document maps Minato controls to common compliance frameworks.
 ### CC6.3 - During Access
 
 **Minato Implementation:**
+
 - RBAC roles enforce least privilege
 - ServiceAccounts with minimal permissions
 - Regular access reviews via Kubernetes audit logs
@@ -32,6 +36,7 @@ This document maps Minato controls to common compliance frameworks.
 ### CC7.1 - System Operations Monitoring
 
 **Minato Implementation:**
+
 - Prometheus metrics for all components
 - Agent metrics exposed on `/metrics` endpoints for scraping
 - Standard metrics: `minato_operator_reconciliations_total`, `minato_gameservers`, etc.
@@ -39,6 +44,7 @@ This document maps Minato controls to common compliance frameworks.
 ### CC7.2 - System Operations Evaluation
 
 **Minato Implementation:**
+
 - Structured audit logging
 - ActionExecution resources record all actions
 - Kubernetes Events for state changes
@@ -48,6 +54,7 @@ This document maps Minato controls to common compliance frameworks.
 ### A.9.1.1 - Access Control Policy
 
 **Minato Implementation:**
+
 - Documented RBAC policy in `chart/templates/rbac.yaml`
 - Three-tier tenant model (viewer, operator, admin)
 - Platform admin role for cluster-wide management
@@ -55,6 +62,7 @@ This document maps Minato controls to common compliance frameworks.
 ### A.9.4.1 - Information Access Restriction
 
 **Minato Implementation:**
+
 - GameProfiles are cluster-scoped but read-only for tenants
 - GameServers are namespace-scoped
 - Cross-tenant access blocked by RBAC and NetworkPolicies
@@ -62,6 +70,7 @@ This document maps Minato controls to common compliance frameworks.
 ### A.12.3.1 - Information Backup
 
 **Minato Implementation:**
+
 - GameSnapshot CRD for declarative backups
 - VolumeSnapshot integration
 - Retention policies (count + duration based)
@@ -69,6 +78,7 @@ This document maps Minato controls to common compliance frameworks.
 ### A.12.4.1 - Event Logging
 
 **Minato Implementation:**
+
 - All API operations logged
 - ActionExecution audit trail
 - Kubernetes Events for resource lifecycle
@@ -76,11 +86,13 @@ This document maps Minato controls to common compliance frameworks.
 ## Data Residency
 
 Minato stores all data in Kubernetes:
+
 - CRDs stored in etcd
 - Game data in PVCs (location depends on storage class)
 - Backups in VolumeSnapshots (location depends on CSI driver)
 
 To ensure data residency:
+
 1. Use storage classes backed by local storage
 2. Configure VolumeSnapshot classes with local targets
 3. Backup etcd to compliant storage
@@ -118,6 +130,7 @@ To ensure data residency:
 ### What is Logged
 
 All state-changing operations:
+
 - GameServer creation/deletion/updates
 - ActionExecution creation and completion
 - GameSnapshot creation and deletion

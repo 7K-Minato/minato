@@ -10,7 +10,7 @@ The minato control plane supports multiple authentication mechanisms simultaneou
 
 All modes can be enabled simultaneously. The system tries each provider in order:
 
-```
+```text
 1. API Key (X-API-Key header) → fastest, for services
 2. Bearer Token (Authorization header) → OIDC
 3. Basic Auth (Authorization header)
@@ -190,7 +190,7 @@ AUTH_OIDC_ISSUER_URL=https://auth.example.com
 ### Predefined Roles
 
 | Role | Permissions |
-|------|-------------|
+| ------ | ------------- |
 | **viewer** | Read-only access to all resources (GET /gameservers, /profiles, /fleets, etc.) |
 | **operator** | Viewer + execute actions, create snapshots, access console |
 | **admin** | Operator + create/delete servers, manage API keys |
@@ -208,6 +208,7 @@ type Permission struct {
 ```
 
 Roles can extend other roles (inheritance):
+
 - `operator` extends `viewer`
 - `admin` extends `operator`
 
@@ -253,6 +254,7 @@ Every request (except health endpoints) is logged as structured JSON:
 ```
 
 **Fields:**
+
 - `timestamp` — ISO 8601 timestamp
 - `user` — Authenticated username
 - `role` — User's role
@@ -295,7 +297,7 @@ curl -H "Authorization: Bearer <oidc-token>" \
 
 ### Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │           HTTP Request                       │
 │                                              │
@@ -358,11 +360,13 @@ curl -H "Authorization: Bearer <oidc-token>" \
 ## Security Recommendations
 
 ### For Development
+
 ```bash
 AUTH_MODE=none
 ```
 
 ### For Small Teams
+
 ```bash
 AUTH_MODE=basic,apikey
 AUTH_BASIC_USER=admin
@@ -373,6 +377,7 @@ AUTH_APIKEY_ENABLED=true
 **Note:** API keys are generated via the API after authenticating with basic auth.
 
 ### For Production / Enterprise
+
 ```bash
 AUTH_MODE=oidc,apikey
 AUTH_OIDC_ISSUER_URL=https://auth.company.com
@@ -381,6 +386,7 @@ AUTH_APIKEY_ENABLED=true
 ```
 
 **Additional measures:**
+
 - Use HTTPS/TLS for all traffic
 - Rotate API keys regularly
 - Implement rate limiting (not yet implemented)
