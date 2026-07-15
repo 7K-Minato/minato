@@ -6,7 +6,7 @@ This document describes the internal architecture and reconcile flow of each Min
 
 Minato uses the [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) framework. Each controller watches one primary resource type and may own (create/manage) child resources.
 
-```
+```text
 ┌─────────────────┐     watches     ┌──────────────────┐
 │   GameServer    │────────────────▶│  GameServer      │
 │   (primary)     │                 │  Reconciler      │
@@ -23,7 +23,7 @@ Minato uses the [controller-runtime](https://github.com/kubernetes-sigs/controll
 
 ## GameServer Reconciler
 
-### Reconcile Flow
+### GameServer Reconcile Flow
 
 The GameServer reconciler follows this 7-step flow:
 
@@ -35,12 +35,12 @@ The GameServer reconciler follows this 7-step flow:
 6. **Reconcile Service**: Create or update the Service (game ports + agent gRPC)
 7. **Reconcile PVC**: Create or update the PersistentVolumeClaim
 8. **Update Status**: Set state (Provisioning/Running/Idle/Error) and conditions
-10. **Health Check**: If running, check agent health via gRPC
-11. **Idle Timeout**: If configured, check for idle timeout and scale down
+9. **Health Check**: If running, check agent health via gRPC
+10. **Idle Timeout**: If configured, check for idle timeout and scale down
 
-### State Machine
+### GameServer State Machine
 
-```
+```text
   Created
      │
      ▼
@@ -63,7 +63,7 @@ Provisioning ◄────────────────┐
 
 ### Idle Timeout Logic
 
-```
+```text
 Every reconcile (or RequeueAfter):
   1. Get player count from agent via gRPC
   2. If players > 0:
@@ -81,7 +81,7 @@ Every reconcile (or RequeueAfter):
 
 ## ActionExecution Reconciler
 
-### Reconcile Flow
+### ActionExecution Reconcile Flow
 
 1. **Fetch ActionExecution**: Get the ActionExecution object
 2. **Initialize State**: Set state to Pending if empty
@@ -101,9 +101,9 @@ Three concurrency modes:
 - **serialize**: Only one instance of this action can run at a time
 - **exclusive**: No other action can run on this server while this one runs
 
-### State Machine
+### ActionExecution State Machine
 
-```
+```text
 Pending ──▶ Running ──▶ Succeeded
    │           │
    │           ├──▶ Failed
@@ -113,7 +113,7 @@ Pending ──▶ Running ──▶ Succeeded
 
 ## GameServerFleet Reconciler
 
-### Reconcile Flow
+### GameServerFleet Reconcile Flow
 
 1. **Fetch Fleet**: Get the GameServerFleet object
 2. **Handle Finalizer**: Add on creation, delete child GameServers on deletion
@@ -125,17 +125,19 @@ Pending ──▶ Running ──▶ Succeeded
 ### Update Strategies
 
 **RollingUpdate** (default):
+
 - When scaling down, delete oldest servers first (by creation timestamp)
 - Ensures gradual replacement during updates
 
 **OnDelete**:
+
 - Never automatically delete excess servers
 - User must manually delete GameServers
 - Useful for controlled maintenance windows
 
 ## GameSnapshot Reconciler
 
-### Reconcile Flow
+### GameSnapshot Reconcile Flow
 
 1. **Fetch GameSnapshot**: Get the GameSnapshot object
 2. **Handle Finalizer**: Add on creation
@@ -149,6 +151,7 @@ Pending ──▶ Running ──▶ Succeeded
 ### Retention Policy
 
 Two dimensions:
+
 - **Count**: Keep only the N most recent snapshots
 - **Duration**: Delete snapshots older than the specified duration
 

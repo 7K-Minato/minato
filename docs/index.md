@@ -8,15 +8,15 @@
 
 ## What lives here
 
-| Section               | Contents                                                                                                                                                                                           |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Architecture**      | How the platform fits together: the [Architecture Overview](architecture/overview.md) and the [Controller Flow](architecture/controller-flow.md).                                                   |
-| **Operations**        | Running minato in production: [installation](operations/installation.md), [configuration](operations/configuration.md), the [CLI](operations/cli.md), [multi-tenancy](operations/multi-tenancy.md), [scalability](operations/scalability.md), [metrics](operations/metrics-schema.md), [security](operations/security.md), and [troubleshooting](operations/troubleshooting.md). |
-| **Runbooks**          | Operational procedures for common failure modes: unreachable agents, crashlooping operators, pending PVCs, and pending StatefulSets.                                                                 |
-| **Compliance**        | Compliance posture and controls mapping.                                                                                                                                                           |
-| **Security**          | The security model: [control plane authentication & authorization](security/authentication.md) and the [communication security architecture](security/communication-security.md).                   |
-| **Agent Developers**  | Building a per-game agent: the [quickstart](agent-developers/quickstart.md), [SDK reference](agent-developers/sdk-reference.md), [API stability guarantees](agent-developers/api-stability.md), and the [console streaming protocol](agent-developers/console-protocol.md). |
-| **Design**            | Design explorations and assessments, including [modern Kubernetes features](design/k8s-features-assessment.md) and [server sharding](design/server-sharding.md).                                    |
+| Section | Contents |
+| --- | --- |
+| **Architecture** | How the platform fits together: the [Architecture Overview](architecture/overview.md) and the [Controller Flow](architecture/controller-flow.md). |
+| **Operations** | Running minato in production: [installation](operations/installation.md), [configuration](operations/configuration.md), the [CLI](operations/cli.md), [multi-tenancy](operations/multi-tenancy.md), [scalability](operations/scalability.md), [metrics](operations/metrics-schema.md), [security](operations/security.md), and [troubleshooting](operations/troubleshooting.md). |
+| **Runbooks** | Operational procedures for common failure modes: unreachable agents, crashlooping operators, pending PVCs, and pending StatefulSets. |
+| **Compliance** | Compliance posture and controls mapping. |
+| **Security** | The security model: [control plane authentication & authorization](security/authentication.md) and the [communication security architecture](security/communication-security.md). |
+| **Agent Developers** | Building a per-game agent: the [quickstart](agent-developers/quickstart.md), [SDK reference](agent-developers/sdk-reference.md), [API stability guarantees](agent-developers/api-stability.md), and the [console streaming protocol](agent-developers/console-protocol.md). |
+| **Design** | Design explorations and assessments, including [modern Kubernetes features](design/k8s-features-assessment.md) and [server sharding](design/server-sharding.md). |
 
 ## Why we publish this
 

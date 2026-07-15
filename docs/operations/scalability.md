@@ -5,7 +5,7 @@ Minato is designed to scale from a single game server to thousands.
 ## Tested Limits
 
 | Metric | Tested Value | Notes |
-|--------|-------------|-------|
+| -------- | ------------- | ------- |
 | GameServers per cluster | 1,000 | Limited by etcd and API server |
 | GameServers per namespace | 100 | Recommended for ResourceQuota |
 | Simultaneous ActionExecutions | 100 | Limited by operator concurrency |
@@ -34,7 +34,7 @@ Minato is designed to scale from a single game server to thousands.
 
 ## Tuning Knobs
 
-### Operator
+### Operator Tuning
 
 ```yaml
 # Increase workers for faster reconciliation
@@ -50,6 +50,7 @@ resources:
 ### etcd
 
 For large deployments (> 500 GameServers):
+
 - Increase etcd memory: `--quota-backend-bytes=8589934592`
 - Enable etcd defragmentation
 - Use dedicated etcd nodes
@@ -72,7 +73,7 @@ For large deployments (> 500 GameServers):
 3. **Webhook latency**: Adds ~100ms to requests
    - For high-throughput, consider caching webhooks
 
-4. **Prometheus metrics cardinality**: 
+4. **Prometheus metrics cardinality**:
    - `minato_gameservers` has labels: state, profile, namespace
    - Limit unique profile + namespace combinations
 

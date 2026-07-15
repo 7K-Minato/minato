@@ -4,7 +4,7 @@ The Minato console streaming protocol provides real-time bidirectional communica
 
 ## WebSocket Endpoint
 
-```
+```text
 WS /api/v1/gameservers/{namespace}/{name}/console
 ```
 
@@ -12,7 +12,7 @@ WS /api/v1/gameservers/{namespace}/{name}/console
 
 The WebSocket connection uses the same authentication as the REST API. Pass authentication tokens via query parameters:
 
-```
+```text
 ws://control-plane/api/v1/gameservers/minato/server-1/console?namespace=minato&token=...
 ```
 

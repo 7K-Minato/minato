@@ -86,7 +86,7 @@ minato-ctl snapshot create my-server
 
 ## Global Flags
 
-- `-s, --server`: Control plane API address (default: http://localhost:8080)
+- `-s, --server`: Control plane API address (default: <http://localhost:8080>)
 - `-n, --namespace`: Default namespace (default: minato)
 - `-h, --help`: Show help
 

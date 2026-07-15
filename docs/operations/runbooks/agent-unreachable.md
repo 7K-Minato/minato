@@ -9,21 +9,25 @@
 ## Diagnosis
 
 1. Check if agent pod is running:
+
 ```bash
 kubectl get pods -n minato -l minato.io/gameserver=SERVER_NAME
 ```
 
-2. Check agent logs:
+1. Check agent logs:
+
 ```bash
 kubectl logs -n minato POD_NAME -c minato-agent
 ```
 
-3. Check service endpoints:
+1. Check service endpoints:
+
 ```bash
 kubectl get endpoints -n minato SERVER_NAME
 ```
 
-4. Test connectivity:
+1. Test connectivity:
+
 ```bash
 kubectl exec -it -n minato deploy/minato-operator -- nc -zv SERVER_NAME 9876
 ```
@@ -35,6 +39,7 @@ kubectl exec -it -n minato deploy/minato-operator -- nc -zv SERVER_NAME 9876
 Symptom: Agent container restarting repeatedly
 
 Solution:
+
 ```bash
 kubectl logs -n minato POD_NAME -c minato-agent
 # Fix configuration issue or restart GameServer
@@ -46,6 +51,7 @@ kubectl delete gameserver SERVER_NAME -n minato
 Symptom: Connection timeout
 
 Solution: Verify NetworkPolicy allows operator to agent communication:
+
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -70,6 +76,7 @@ spec:
 Symptom: Agent container starts but doesn't expose gRPC port
 
 Solution: Check GameProfile agent configuration:
+
 ```bash
 kubectl get gameprofile PROFILE_NAME -o jsonpath='{.spec.agent.image}'
 ```
@@ -77,11 +84,13 @@ kubectl get gameprofile PROFILE_NAME -o jsonpath='{.spec.agent.image}'
 ## Recovery
 
 1. Restart the GameServer to recreate the pod:
+
 ```bash
 kubectl delete pod -n minato POD_NAME
 ```
 
-2. If persistent, check GameProfile and GameServer configuration:
+1. If persistent, check GameProfile and GameServer configuration:
+
 ```bash
 kubectl get gameserver SERVER_NAME -n minato -o yaml
 kubectl get gameprofile PROFILE_NAME -o yaml

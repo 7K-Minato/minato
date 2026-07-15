@@ -9,16 +9,19 @@
 ## Diagnosis
 
 1. Check pod status:
+
 ```bash
 kubectl describe pod -n minato -l app.kubernetes.io/component=operator
 ```
 
-2. Check logs:
+1. Check logs:
+
 ```bash
 kubectl logs -n minato -l app.kubernetes.io/component=operator --previous
 ```
 
-3. Check events:
+1. Check events:
+
 ```bash
 kubectl get events -n minato --sort-by=.lastTimestamp
 ```
@@ -30,6 +33,7 @@ kubectl get events -n minato --sort-by=.lastTimestamp
 Symptom: Pod killed with exit code 137
 
 Solution: Increase memory limit:
+
 ```bash
 kubectl patch deployment minato-operator -n minato -p '{"spec":{"template":{"spec":{"containers":[{"name":"operator","resources":{"limits":{"memory":"256Mi"}}}]}}}}'
 ```
@@ -39,6 +43,7 @@ kubectl patch deployment minato-operator -n minato -p '{"spec":{"template":{"spe
 Symptom: Permission denied errors in logs
 
 Solution: Verify ClusterRoleBinding exists:
+
 ```bash
 kubectl get clusterrolebinding minato-manager-rolebinding
 ```
@@ -48,6 +53,7 @@ kubectl get clusterrolebinding minato-manager-rolebinding
 Symptom: Connection refused errors
 
 Solution: Check network connectivity and API server status:
+
 ```bash
 kubectl cluster-info
 ```
@@ -57,12 +63,14 @@ kubectl cluster-info
 If the operator cannot recover automatically:
 
 1. Scale to 0 and back:
+
 ```bash
 kubectl scale deployment minato-operator -n minato --replicas=0
 kubectl scale deployment minato-operator -n minato --replicas=1
 ```
 
-2. If persistent, check for corrupted state:
+1. If persistent, check for corrupted state:
+
 ```bash
 kubectl delete lease minato-operator -n minato
 ```

@@ -7,6 +7,7 @@
 **What:** Native sidecar lifecycle management. Sidecars start before app containers and block pod termination until they exit.
 
 **Impact for minato:**
+
 - Agent container is guaranteed to start before game server
 - Agent can gracefully shutdown (save world, notify players) before pod terminates
 - No more race conditions during pod startup
@@ -36,6 +37,7 @@ containers:
 **What:** Initialize PVCs from data sources (snapshots, other PVCs) at creation time.
 
 **Impact for minato:**
+
 - `GameServer.spec.storage.snapshotRef` could be implemented natively
 - No manual "clone PVC then create server" workflow
 - Faster restores (population happens before pod scheduling)
@@ -61,6 +63,7 @@ spec:
 **What:** Pods can opt-out of being considered for scheduling (for autoscaling, load balancing) until ready.
 
 **Impact for minato:**
+
 - Game servers can signal "not ready for players" during world loading
 - Fleet autoscaler only counts truly-ready servers
 - Prevents players joining while world is still loading
@@ -85,6 +88,7 @@ Agent removes the gate once the game world is fully loaded.
 **What:** Distribute pods across topology domains (zones, nodes) for HA.
 
 **Impact for minato:**
+
 - Fleet shards spread across availability zones
 - Prevents all game servers on same node (node failure = outage)
 - Zone-aware player routing
@@ -113,6 +117,7 @@ spec:
 **What:** Ensure critical game servers get scheduled even under resource pressure.
 
 **Impact for minato:**
+
 - Live game servers: high priority (don't evict)
 - Staging/test servers: low priority (evict first)
 - Fleet scaling: new shards preempt lower-priority workloads
@@ -140,6 +145,7 @@ description: "Production game servers - do not evict"
 **What:** Debug running pods by attaching temporary containers.
 
 **Impact for minato:**
+
 - Debug a running game server without restarting
 - Attach `tcpdump`, `strace`, or custom debug tools
 - Inspect game files in a running pod
@@ -158,6 +164,7 @@ kubectl debug -it minecraft-smp-1 --image=nicolaka/netshoot --target=minato-game
 **What:** Control how many pods can be voluntarily disrupted (evicted, drained).
 
 **Impact for minato:**
+
 - Ensure at least N game servers remain during node upgrades
 - Prevent cluster autoscaler from terminating player-active servers
 
@@ -183,6 +190,7 @@ spec:
 **What:** Fine-grained GPU/resource scheduling beyond limits/requests.
 
 **Impact for minato:**
+
 - Games with GPU requirements (AI NPCs, physics simulation)
 - Fractional GPU allocation (one GPU shared across multiple servers)
 
@@ -204,6 +212,7 @@ resources:
 **What:** PVC access mode that restricts to a single pod (even stricter than RWO).
 
 **Impact for minato:**
+
 - Game server PVCs guaranteed single-writer
 - Prevents accidental multi-attach (data corruption)
 
@@ -223,6 +232,7 @@ spec:
 **What:** Automatically adjust CPU/memory requests based on actual usage.
 
 **Impact for minato:**
+
 - Right-size game servers (many are over-provisioned)
 - Reduce infrastructure costs
 - Note: VPA requires pod restart (not in-place update)
@@ -239,6 +249,7 @@ spec:
 **What:** Successor to Ingress. More flexible traffic routing.
 
 **Impact for minato:**
+
 - Multi-protocol routing (TCP/UDP for game traffic, HTTP for APIs)
 - Weighted routing for canary deployments
 - Direct integration with service mesh
@@ -251,6 +262,7 @@ spec:
 **What:** Scale workloads based on custom metrics (not just CPU/memory).
 
 **Impact for minato:**
+
 - Scale fleet based on player queue depth
 - Scale based on matchmaking wait times
 - Scale to zero when no players (already partially supported via idle timeout)
@@ -263,6 +275,7 @@ spec:
 **What:** Multi-cluster pod-to-pod connectivity with service discovery.
 
 **Impact for minato:**
+
 - Players can migrate between clusters (EU → US) seamlessly
 - Cross-cluster fleet management
 - Global service discovery
@@ -275,6 +288,7 @@ spec:
 **What:** Queue-based workload scheduling. Manage quotas and priorities.
 
 **Impact for minato:**
+
 - Queue server creation requests when quota is exhausted
 - Fair sharing across tenants
 - Batch action execution
@@ -287,7 +301,7 @@ spec:
 ## Summary Matrix
 
 | Feature | K8s Version | Impact | Effort | Status |
-|---------|-------------|--------|--------|--------|
+| --------- | ------------- | -------- | -------- | -------- |
 | **Sidecar Containers** | 1.29+ | High | Low | Phase 2 |
 | **Volume Populators** | 1.24+ | High | Low | ✅ Partial |
 | **Scheduling Readiness** | 1.30+ | High | Medium | Phase 2 |
