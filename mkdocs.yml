@@ -1,0 +1,73 @@
+site_name: minato — 7KGroup Docs
+site_description: Documentation for minato, the 7KGroup Kubernetes-native platform for hosting persistent, multi-game dedicated game servers.
+site_url: https://docs.7kgroup.io/minato/
+docs_dir: docs
+repo_url: https://github.com/7K-Minato/minato
+
+theme:
+  name: material
+  logo: assets/icon.svg
+  favicon: assets/icon.svg
+  palette:
+    - scheme: default
+      primary: black
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - architecture/overview.md
+      - architecture/controller-flow.md
+  - Operations:
+      - operations/installation.md
+      - operations/configuration.md
+      - operations/cli.md
+      - operations/multi-tenancy.md
+      - operations/scalability.md
+      - operations/metrics-schema.md
+      - operations/security.md
+      - operations/troubleshooting.md
+  - Runbooks:
+      - operations/runbooks/agent-unreachable.md
+      - operations/runbooks/operator-crashlooping.md
+      - operations/runbooks/pvc-pending.md
+      - operations/runbooks/statefulset-pending.md
+  - Compliance:
+      - operations/compliance/README.md
+  - Security:
+      - security/authentication.md
+      - security/communication-security.md
+  - Agent Developers:
+      - agent-developers/quickstart.md
+      - agent-developers/sdk-reference.md
+      - agent-developers/api-stability.md
+      - agent-developers/console-protocol.md
+  - Design:
+      - design/k8s-features-assessment.md
+      - design/server-sharding.md
+  - 7KGroup ↗: https://7kgroup.org
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+
+extra:
+  generator: false
