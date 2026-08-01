@@ -68,14 +68,16 @@ func (c *minecraftRCON) auth(password string) error {
 	return nil
 }
 
-func (c *minecraftRCON) sendPacket(id int32, body string) error {
+// sendPacket writes one RCON packet: length, request ID, type, null-terminated
+// body, trailing null. RCON types: 3 = login, 2 = command.
+func (c *minecraftRCON) sendPacket(ptype int32, body string) error {
 	bodyBytes := []byte(body)
 	length := int32(4 + 4 + len(bodyBytes) + 2) // id + type + body + 2 null bytes
 
 	buf := make([]byte, 4+length)
 	binary.LittleEndian.PutUint32(buf[0:4], uint32(length))
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(id))
-	binary.LittleEndian.PutUint32(buf[8:12], 2) // command type
+	binary.LittleEndian.PutUint32(buf[4:8], 1) // request id
+	binary.LittleEndian.PutUint32(buf[8:12], uint32(ptype))
 	copy(buf[12:], bodyBytes)
 	buf[12+len(bodyBytes)] = 0
 	buf[12+len(bodyBytes)+1] = 0
