@@ -472,10 +472,11 @@ func TestBuildGameService(t *testing.T) {
 	profile := newTestProfile()
 	labels := buildGameServerLabels(server, profile)
 
-	svc := buildGameService(server, profile, labels)
+	svc := buildGameService(server, profile, labels, "")
 	assert.Equal(t, corev1.ServiceTypeLoadBalancer, svc.Spec.Type)
 	assert.Equal(t, server.Name+"-game", svc.Name)
 	assert.Equal(t, labels, svc.Spec.Selector)
+	assert.Empty(t, svc.Annotations)
 	require.Len(t, svc.Spec.Ports, len(profile.Spec.Ports))
 	assert.Equal(t, int32(25565), svc.Spec.Ports[0].Port)
 
@@ -485,13 +486,36 @@ func TestBuildGameService(t *testing.T) {
 		operatorv1.PortSpec{Name: "rcon", ContainerPort: 25575, Protocol: corev1.ProtocolTCP, Exposed: &hidden},
 		operatorv1.PortSpec{Name: "game-dup", ContainerPort: 25565, Protocol: corev1.ProtocolTCP},
 	)
-	svc = buildGameService(server, profile, labels)
+	svc = buildGameService(server, profile, labels, "")
 	names := []string{}
 	for _, p := range svc.Spec.Ports {
 		names = append(names, p.Name)
 	}
 	assert.NotContains(t, names, "rcon")
 	assert.NotContains(t, names, "game-dup", "duplicate port+protocol must be deduped")
+}
+
+func TestBuildGameServicePinAndDNS(t *testing.T) {
+	server := newTestGameServer()
+	server.Spec.LoadBalancerIP = "10.0.0.99"
+	profile := newTestProfile()
+	labels := buildGameServerLabels(server, profile)
+
+	svc := buildGameService(server, profile, labels, "games.example.com")
+	assert.Equal(t, "10.0.0.99", svc.Spec.LoadBalancerIP)
+	assert.Equal(t, server.Name+".games.example.com",
+		svc.Annotations["external-dns.alpha.kubernetes.io/hostname"])
+}
+
+func TestGameServerReconciler_ResolveEndpointsDNSZone(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme, ExternalDNSZone: "games.example.com"}
+
+	endpoints := reconciler.resolveEndpoints(context.Background(), server, newTestProfile())
+	require.NotEmpty(t, endpoints)
+	assert.Equal(t, server.Name+".games.example.com", endpoints[0].Address)
 }
 
 func TestGameServerReconciler_UpdateAgentStatus(t *testing.T) {

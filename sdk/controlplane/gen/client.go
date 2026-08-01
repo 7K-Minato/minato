@@ -323,6 +323,9 @@ type GameServerSpec struct {
 		AutoStart          *bool `json:"autoStart,omitempty"`
 		IdleTimeoutSeconds *int  `json:"idleTimeoutSeconds,omitempty"`
 	} `json:"lifecycle,omitempty"`
+
+	// LoadBalancerIP Pin a specific external IP for the game server's LoadBalancer service
+	LoadBalancerIP    *string `json:"loadBalancerIP,omitempty"`
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
 
 	// Profile Reference to GameProfile name

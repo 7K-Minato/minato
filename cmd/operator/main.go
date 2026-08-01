@@ -184,6 +184,7 @@ func main() {
 		Scheme:            mgr.GetScheme(),
 		OperatorNamespace: os.Getenv("POD_NAMESPACE"),
 		ImagePullSecrets:  pullSecrets,
+		ExternalDNSZone:   os.Getenv("EXTERNAL_DNS_ZONE"),
 	}
 	if err := gsr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServer")

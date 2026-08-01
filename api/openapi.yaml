@@ -567,6 +567,9 @@ components:
           $ref: "#/components/schemas/StorageSpec"
         priorityClassName:
           type: string
+        loadBalancerIP:
+          type: string
+          description: Pin a specific external IP for the game server's LoadBalancer service
         lifecycle:
           type: object
           properties:

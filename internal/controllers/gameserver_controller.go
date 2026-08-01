@@ -54,6 +54,10 @@ type GameServerReconciler struct {
 	// must exist in OperatorNamespace; the reconciler replicates them into
 	// the GameServer's namespace.
 	ImagePullSecrets []string
+	// ExternalDNSZone, when set, annotates game LoadBalancer services with an
+	// external-dns hostname (<server>.<zone>) and publishes that hostname in
+	// status.endpoints instead of the raw IP.
+	ExternalDNSZone string
 }
 
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch;create;update;patch;delete
@@ -156,7 +160,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// LoadBalancer service for player traffic (external IP via MetalLB etc.)
-	gameSvc := buildGameService(server, profile, labelsMap)
+	gameSvc := buildGameService(server, profile, labelsMap, r.ExternalDNSZone)
 	if err := controllerutil.SetControllerReference(server, gameSvc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -305,21 +309,27 @@ func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operato
 	return r.Status().Update(ctx, server)
 }
 
-// resolveEndpoints maps exposed profile ports to the external address of the
-// game server's LoadBalancer service. Empty until the load balancer assigns
-// an ingress address — pod IPs are never published.
+// resolveEndpoints maps exposed profile ports to the player-facing address of
+// the game server: the external-dns hostname when a zone is configured,
+// otherwise the LoadBalancer ingress IP. Empty until the address exists —
+// pod IPs are never published.
 func (r *GameServerReconciler) resolveEndpoints(ctx context.Context, server *operatorv1.GameServer, profile *operatorv1.GameProfile) []operatorv1.Endpoint {
-	svc := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: server.Name + "-game", Namespace: server.Namespace}, svc); err != nil {
-		return nil
-	}
-	if len(svc.Status.LoadBalancer.Ingress) == 0 {
-		return nil
-	}
-	ingress := svc.Status.LoadBalancer.Ingress[0]
-	address := ingress.IP
-	if address == "" {
-		address = ingress.Hostname
+	address := ""
+	if r.ExternalDNSZone != "" {
+		address = server.Name + "." + r.ExternalDNSZone
+	} else {
+		svc := &corev1.Service{}
+		if err := r.Get(ctx, types.NamespacedName{Name: server.Name + "-game", Namespace: server.Namespace}, svc); err != nil {
+			return nil
+		}
+		if len(svc.Status.LoadBalancer.Ingress) == 0 {
+			return nil
+		}
+		ingress := svc.Status.LoadBalancer.Ingress[0]
+		address = ingress.IP
+		if address == "" {
+			address = ingress.Hostname
+		}
 	}
 	if address == "" {
 		return nil
@@ -620,11 +630,13 @@ func buildHeadlessService(
 // buildGameService creates the player-facing LoadBalancer Service for a game
 // server. One service port per exposed profile port; the external IP is
 // assigned by the cluster's load balancer (e.g. MetalLB) and surfaced via
-// status.endpoints.
+// status.endpoints. spec.loadBalancerIP pins the address; when dnsZone is
+// set, an external-dns hostname annotation is added.
 func buildGameService(
 	server *operatorv1.GameServer,
 	profile *operatorv1.GameProfile,
 	labelsMap map[string]string,
+	dnsZone string,
 ) *corev1.Service {
 	type protoPort struct {
 		port     int32
@@ -653,7 +665,7 @@ func buildGameService(
 		})
 	}
 
-	return &corev1.Service{
+	svc := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      server.Name + "-game",
@@ -666,6 +678,15 @@ func buildGameService(
 			Ports:    ports,
 		},
 	}
+	if server.Spec.LoadBalancerIP != "" {
+		svc.Spec.LoadBalancerIP = server.Spec.LoadBalancerIP
+	}
+	if dnsZone != "" {
+		svc.Annotations = map[string]string{
+			"external-dns.alpha.kubernetes.io/hostname": server.Name + "." + dnsZone,
+		}
+	}
+	return svc
 }
 
 // buildAgentService creates a ClusterIP Service for the agent gRPC port.

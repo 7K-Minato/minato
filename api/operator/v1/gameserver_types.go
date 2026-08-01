@@ -90,6 +90,13 @@ type GameServerSpec struct {
 	// +listType=map
 	// +listMapKey=topologyKey
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
+	// loadBalancerIP requests a specific external IP for the game server's
+	// LoadBalancer service, keeping the player-facing address stable across
+	// server recreation. Must belong to the cluster's load balancer pool;
+	// the service stays pending if the address is unavailable.
+	// +optional
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
 
 // Endpoint defines a network endpoint for a GameServer.
