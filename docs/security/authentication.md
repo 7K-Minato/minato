@@ -218,20 +218,26 @@ Roles can extend other roles (inheritance):
 // Public (no auth required)
 GET /healthz
 GET /readyz
+GET /auth/config
 
 // Viewer+ can read
 GET /api/v1/gameservers
 GET /api/v1/profiles
 
-// Operator+ can execute actions
+// Operator+ can execute actions, create snapshots and open consoles
 POST /api/v1/gameservers/{ns}/{name}/actions/{action}
+POST /api/v1/gameservers/{ns}/{name}/snapshots
+GET  /api/v1/gameservers/{ns}/{name}/console   # WebSocket
 
 // Admin only
 POST /api/v1/gameservers/{namespace}
 DELETE /api/v1/gameservers/{namespace}/{name}
-POST /api/v1/apikeys                    # Generate API keys
-DELETE /api/v1/apikeys/{name}           # Revoke API keys
+GET/POST/DELETE /api/v1/apikeys               # API key management
 ```
+
+The mapping is enforced by a route guard driven from a rule table
+(`internal/controlplane/rbac/routeguard.go`), applied to the routes generated from
+`api/openapi.yaml`.
 
 ---
 

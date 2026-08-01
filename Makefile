@@ -54,7 +54,7 @@ helm-crds: ## Copy CRDs into the Helm chart.
 	cp config/crd/bases/*.yaml chart/files/crds/
 
 .PHONY: generate
-generate: controller-gen buf-generate ## Generate DeepCopy methods and protobuf code.
+generate: controller-gen buf-generate oapi-generate ## Generate DeepCopy methods, protobuf code, and OpenAPI server code.
 	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt",year=$(YEAR) paths="./..."
 
 .PHONY: fmt
@@ -227,10 +227,12 @@ KIND ?= kind
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+OAPI_CODEGEN ?= $(LOCALBIN)/oapi-codegen
 BUF ?= buf
 
 ## Tool Versions
 CONTROLLER_TOOLS_VERSION ?= v0.20.1
+OAPI_CODEGEN_VERSION ?= v2.4.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -260,6 +262,14 @@ buf-generate: ## Generate Go code from protobufs.
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
+
+.PHONY: oapi-generate
+oapi-generate: $(OAPI_CODEGEN) ## Generate chi server interface from api/openapi.yaml.
+	"$(OAPI_CODEGEN)" -config internal/controlplane/oapi/oapi-codegen.yaml api/openapi.yaml
+	"$(OAPI_CODEGEN)" -config sdk/controlplane/gen/oapi-codegen.yaml api/openapi.yaml
+
+$(OAPI_CODEGEN): $(LOCALBIN)
+	$(call go-install-tool,$(OAPI_CODEGEN),github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen,$(OAPI_CODEGEN_VERSION))
 
 .PHONY: setup-envtest
 setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://minato.7kgroup.com/schemas/console-message.json",
+  "title": "ConsoleMessage",
+  "description": "One frame of the minato console WebSocket protocol. Direction is determined by `type`: clients send rcon/ping, servers send log/rcon-response/status/error. See docs/agent-developers/console-protocol.md.",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["rcon", "ping", "log", "rcon-response", "status", "error"]
+    },
+    "ts": {
+      "type": "integer",
+      "description": "Unix timestamp (server-generated messages)"
+    },
+    "line": {
+      "type": "string",
+      "description": "Log line content (type=log)"
+    },
+    "id": {
+      "type": "string",
+      "description": "Optional correlation id echoed between request and response"
+    },
+    "data": {
+      "type": "string",
+      "description": "Payload: rcon command, ping message, rcon response, status state, or error message"
+    }
+  },
+  "required": ["type"],
+  "additionalProperties": false
+}

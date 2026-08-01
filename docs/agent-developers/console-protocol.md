@@ -2,6 +2,12 @@
 
 The Minato console streaming protocol provides real-time bidirectional communication between clients and game server agents via WebSocket.
 
+> **Normative contract.** This document and the machine-readable schema
+> [`api/console.schema.json`](https://github.com/7K-Minato/minato/blob/main/api/console.schema.json)
+> are the source of truth for the console protocol. The control plane
+> (`cmd/controlplane/console.go`), minato cloud's console proxy, the web
+> dashboard, and `minato-ctl` must all implement against it.
+
 ## WebSocket Endpoint
 
 ```text
@@ -10,15 +16,19 @@ WS /api/v1/gameservers/{namespace}/{name}/console
 
 ### Authentication
 
-The WebSocket connection uses the same authentication as the REST API. Pass authentication tokens via query parameters:
+The WebSocket connection uses the same authentication as the REST API
+(`Authorization: Bearer <token>` header during the upgrade request). Browsers
+that cannot set WebSocket headers may pass the token as a query parameter:
 
 ```text
-ws://control-plane/api/v1/gameservers/minato/server-1/console?namespace=minato&token=...
+wss://control-plane/api/v1/gameservers/minato/server-1/console?access_token=...
 ```
 
 ## Message Protocol
 
-All messages are JSON-encoded.
+All messages are JSON-encoded and must validate against
+`api/console.schema.json`. Unknown message types must be ignored by receivers
+(forward compatibility).
 
 ### Client → Server Messages
 

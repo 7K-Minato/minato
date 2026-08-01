@@ -1,33 +1,25 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
-)
 
-// ConsoleMessage represents a message in the WebSocket protocol
-type ConsoleMessage struct {
-	Type string `json:"type"`
-	TS   int64  `json:"ts,omitempty"`
-	Line string `json:"line,omitempty"`
-	ID   string `json:"id,omitempty"`
-	Data string `json:"data,omitempty"`
-}
+	"github.com/7k-minato/minato/sdk/controlplane"
+)
 
 var (
 	serverAddr string
 	namespace  string
+	apiKey     string
 )
 
 func main() {
@@ -38,6 +30,7 @@ func main() {
 
 	rootCmd.PersistentFlags().StringVarP(&serverAddr, "server", "s", "http://localhost:8080", "Control plane API address")
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "minato", "Default namespace")
+	rootCmd.PersistentFlags().StringVarP(&apiKey, "api-key", "k", os.Getenv("MINATO_API_KEY"), "API key (or MINATO_API_KEY)")
 
 	rootCmd.AddCommand(
 		serverCmd(),
@@ -53,6 +46,19 @@ func main() {
 	}
 }
 
+func newClient() (*controlplane.Client, error) {
+	return controlplane.NewClient(serverAddr, apiKey, 30*time.Second)
+}
+
+func printJSON(v any) error {
+	pretty, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(pretty))
+	return nil
+}
+
 func serverCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
@@ -64,7 +70,15 @@ func serverCmd() *cobra.Command {
 			Use:   "list",
 			Short: "List game servers",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return getJSON(path.Join("/api/v1/gameservers"))
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				servers, err := c.ListGameServers(cmd.Context())
+				if err != nil {
+					return err
+				}
+				return printJSON(servers)
 			},
 		},
 		&cobra.Command{
@@ -72,11 +86,19 @@ func serverCmd() *cobra.Command {
 			Short: "Get a game server",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return getJSON(path.Join("/api/v1/gameservers", namespace, args[0]))
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				server, err := c.GetGameServer(cmd.Context(), namespace, args[0])
+				if err != nil {
+					return err
+				}
+				return printJSON(server)
 			},
 		},
 		&cobra.Command{
-			Use:   "action [name] [action]",
+			Use:   "action [name] [action] [key=value...]",
 			Short: "Execute an action on a game server",
 			Args:  cobra.MinimumNArgs(2),
 			RunE: func(cmd *cobra.Command, args []string) error {
@@ -87,7 +109,15 @@ func serverCmd() *cobra.Command {
 						params[parts[0]] = parts[1]
 					}
 				}
-				return postJSON(path.Join("/api/v1/gameservers", namespace, args[0], "actions", args[1]), params)
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				ref, err := c.ExecuteAction(cmd.Context(), namespace, args[0], args[1], params)
+				if err != nil {
+					return err
+				}
+				return printJSON(ref)
 			},
 		},
 	)
@@ -106,7 +136,15 @@ func fleetCmd() *cobra.Command {
 			Use:   "list",
 			Short: "List fleets",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return getJSON("/api/v1/gameserverfleets")
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				fleets, err := c.ListGameServerFleets(cmd.Context())
+				if err != nil {
+					return err
+				}
+				return printJSON(fleets)
 			},
 		},
 		&cobra.Command{
@@ -114,7 +152,15 @@ func fleetCmd() *cobra.Command {
 			Short: "Get a fleet",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return getJSON(path.Join("/api/v1/gameserverfleets", namespace, args[0]))
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				fleet, err := c.GetGameServerFleet(cmd.Context(), namespace, args[0])
+				if err != nil {
+					return err
+				}
+				return printJSON(fleet)
 			},
 		},
 	)
@@ -133,7 +179,15 @@ func profileCmd() *cobra.Command {
 			Use:   "list",
 			Short: "List profiles",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return getJSON("/api/v1/profiles")
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				profiles, err := c.ListProfiles(cmd.Context())
+				if err != nil {
+					return err
+				}
+				return printJSON(profiles)
 			},
 		},
 		&cobra.Command{
@@ -141,7 +195,15 @@ func profileCmd() *cobra.Command {
 			Short: "Get a profile",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return getJSON(path.Join("/api/v1/profiles", args[0]))
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				profile, err := c.GetProfile(cmd.Context(), args[0])
+				if err != nil {
+					return err
+				}
+				return printJSON(profile)
 			},
 		},
 	)
@@ -161,7 +223,15 @@ func snapshotCmd() *cobra.Command {
 			Short: "List snapshots for a server",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return getJSON(path.Join("/api/v1/gameservers", namespace, args[0], "snapshots"))
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				snapshots, err := c.ListSnapshots(cmd.Context(), namespace, args[0])
+				if err != nil {
+					return err
+				}
+				return printJSON(snapshots)
 			},
 		},
 		&cobra.Command{
@@ -169,7 +239,15 @@ func snapshotCmd() *cobra.Command {
 			Short: "Create a snapshot for a server",
 			Args:  cobra.ExactArgs(1),
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return postJSON(path.Join("/api/v1/gameservers", namespace, args[0], "snapshots"), nil)
+				c, err := newClient()
+				if err != nil {
+					return err
+				}
+				snapshot, err := c.CreateSnapshot(cmd.Context(), namespace, args[0])
+				if err != nil {
+					return err
+				}
+				return printJSON(snapshot)
 			},
 		},
 	)
@@ -178,64 +256,17 @@ func snapshotCmd() *cobra.Command {
 }
 
 func consoleCmd() *cobra.Command {
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "console [server]",
 		Short: "Open interactive console to a game server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runConsole(args[0])
+			return runConsole(cmd.Context(), args[0])
 		},
 	}
-
-	return cmd
 }
 
-func getJSON(apiPath string) error {
-	resp, err := http.Get(serverAddr + apiPath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var result any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%s: %s", resp.Status, string(body))
-	}
-
-	pretty, _ := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(pretty))
-	return nil
-}
-
-func postJSON(apiPath string, data any) error {
-	var body []byte
-	if data != nil {
-		var err error
-		body, err = json.Marshal(data)
-		if err != nil {
-			return err
-		}
-	}
-
-	resp, err := http.Post(serverAddr+apiPath, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var result any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%s: %s", resp.Status, string(respBody))
-	}
-
-	pretty, _ := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(pretty))
-	return nil
-}
-
-func runConsole(serverName string) error {
+func runConsole(ctx context.Context, serverName string) error {
 	u, err := url.Parse(serverAddr)
 	if err != nil {
 		return err
@@ -247,10 +278,13 @@ func runConsole(serverName string) error {
 		wsScheme = "wss"
 	}
 
-	wsURL := fmt.Sprintf("%s://%s/api/v1/gameservers/%s/%s/console?namespace=%s",
-		wsScheme, u.Host, namespace, serverName, namespace)
+	wsURL := fmt.Sprintf("%s://%s/api/v1/gameservers/%s/%s/console", wsScheme, u.Host, namespace, serverName)
 
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	header := http.Header{}
+	if apiKey != "" {
+		header.Set("Authorization", "Bearer "+apiKey)
+	}
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, header)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
@@ -263,21 +297,21 @@ func runConsole(serverName string) error {
 	go func() {
 		defer close(done)
 		for {
-			var msg ConsoleMessage
+			var msg controlplane.ConsoleMessage
 			if err := conn.ReadJSON(&msg); err != nil {
 				fmt.Fprintf(os.Stderr, "\nConnection closed: %v\n", err)
 				return
 			}
 
 			switch msg.Type {
-			case "log":
+			case controlplane.ConsoleTypeLog:
 				tm := time.Unix(msg.TS, 0).Format("15:04:05")
 				fmt.Printf("[%s] %s\n", tm, msg.Line)
-			case "rcon-response":
+			case controlplane.ConsoleTypeRconResponse:
 				fmt.Printf("> %s\n", msg.Data)
-			case "error":
+			case controlplane.ConsoleTypeError:
 				fmt.Fprintf(os.Stderr, "Error: %s\n", msg.Data)
-			case "status":
+			case controlplane.ConsoleTypeStatus:
 				fmt.Printf("[Status: %s]\n", msg.Data)
 			}
 		}
@@ -291,7 +325,7 @@ func runConsole(serverName string) error {
 			break
 		}
 
-		msg := ConsoleMessage{Type: "rcon", Data: input}
+		msg := controlplane.ConsoleMessage{Type: controlplane.ConsoleTypeRcon, Data: input}
 		if err := conn.WriteJSON(msg); err != nil {
 			fmt.Fprintf(os.Stderr, "Send error: %v\n", err)
 			break

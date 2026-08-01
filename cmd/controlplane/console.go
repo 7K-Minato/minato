@@ -15,6 +15,7 @@ import (
 
 	agentv1 "github.com/7k-minato/minato/api/agent/v1/minato/agent/v1"
 	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/sdk/controlplane"
 )
 
 const defaultAgentGRPCPort = 9876
@@ -33,27 +34,15 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// ConsoleMessage represents a message in the WebSocket protocol
-type ConsoleMessage struct {
-	Type string `json:"type"`
-	TS   int64  `json:"ts,omitempty"`
-	Line string `json:"line,omitempty"`
-	ID   string `json:"id,omitempty"`
-	Data string `json:"data,omitempty"`
-}
+// ConsoleMessage is one frame of the console WebSocket protocol.
+// Canonical definition lives in the SDK (contract: api/console.schema.json).
+type ConsoleMessage = controlplane.ConsoleMessage
 
-func (api *controlPlaneAPI) handleConsole(w http.ResponseWriter, r *http.Request) {
-	ns := r.URL.Query().Get("namespace")
-	name := r.URL.Query().Get("name")
-	if ns == "" || name == "" {
-		http.Error(w, "namespace and name required", http.StatusBadRequest)
-		return
-	}
-
+func (api *controlPlaneAPI) serveConsole(w http.ResponseWriter, r *http.Request, ns, name string) {
 	// Verify GameServer exists
 	server := &operatorv1.GameServer{}
 	if err := api.client.Get(r.Context(), types.NamespacedName{Name: name, Namespace: ns}, server); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeError(w, http.StatusNotFound, err)
 		return
 	}
 

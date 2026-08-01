@@ -43,10 +43,3 @@ spec:
       description: "Save the game world"
       concurrency: exclusive
       timeout: 2m
-  observability:
-    agentMetrics:
-      port: 9090
-      path: /metrics
-    serviceMonitor:
-      enabled: true
-      interval: 30s

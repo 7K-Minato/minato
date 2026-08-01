@@ -32,6 +32,7 @@ nav:
   - Architecture:
       - architecture/overview.md
       - architecture/controller-flow.md
+      - architecture/api-conventions.md
   - Operations:
       - operations/installation.md
       - operations/configuration.md

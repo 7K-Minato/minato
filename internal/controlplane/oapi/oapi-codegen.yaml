@@ -1,0 +1,11 @@
+# oapi-codegen configuration for the control plane server.
+# Source of truth: ../../api/openapi.yaml
+package: oapi
+output: internal/controlplane/oapi/gen.go
+generate:
+  chi-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-fmt: false
+  skip-prune: false

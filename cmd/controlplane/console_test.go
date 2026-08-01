@@ -26,27 +26,12 @@ func setupConsoleTestAPI(objs ...client.Object) *controlPlaneAPI {
 	return api
 }
 
-func TestHandleConsole_MissingParams(t *testing.T) {
-	api := setupConsoleTestAPI()
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/gameservers/default/gs1/console", nil)
-	api.handleConsole(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), "namespace and name required") {
-		t.Fatalf("unexpected error message: %s", rec.Body.String())
-	}
-}
-
 func TestHandleConsole_GameServerNotFound(t *testing.T) {
 	api := setupConsoleTestAPI()
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/gameservers/default/gs1/console?namespace=default&name=gs1", nil)
-	api.handleConsole(rec, req)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/gameservers/default/gs1/console", nil)
+	api.serveConsole(rec, req, "default", "gs1")
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
@@ -61,15 +46,15 @@ func TestHandleConsole_UpgradeFails(t *testing.T) {
 	api := setupConsoleTestAPI(gs)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/gameservers/default/gs1/console?namespace=default&name=gs1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/gameservers/default/gs1/console", nil)
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-Websocket-Version", "13")
 	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
 	// httptest.ResponseRecorder is not a valid hijacker, so Upgrade will fail with 500
-	api.handleConsole(rec, req)
+	api.serveConsole(rec, req, "default", "gs1")
 
-	// When upgrade fails, handleConsole writes an HTTP error response
+	// When upgrade fails, serveConsole writes an HTTP error response
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d: %s", rec.Code, rec.Body.String())
 	}

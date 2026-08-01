@@ -14,9 +14,13 @@ func NewAPIKeyProvider(storage *APIKeyStorage) *APIKeyProvider {
 	return &APIKeyProvider{storage: storage}
 }
 
-// Authenticate validates an API key from the X-API-Key header.
+// Authenticate validates an API key from the X-API-Key header,
+// falling back to the Authorization: Bearer header.
 func (p *APIKeyProvider) Authenticate(r *http.Request) (*User, error) {
 	keyValue := r.Header.Get("X-API-Key")
+	if keyValue == "" {
+		keyValue = ExtractBearer(r)
+	}
 	if keyValue == "" {
 		return nil, ErrUnauthorized
 	}

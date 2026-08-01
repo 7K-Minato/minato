@@ -26,6 +26,7 @@ jobs:
       helm: ${{ steps.filter.outputs.helm }}
       proto: ${{ steps.filter.outputs.proto }}
       docker: ${{ steps.filter.outputs.docker }}
+      openapi: ${{ steps.filter.outputs.openapi }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -52,6 +53,8 @@ jobs:
               - 'Dockerfile'
               - '**/Dockerfile'
               - '.dockerignore'
+            openapi:
+              - 'api/openapi.yaml'
 
   lint:
     needs: changes
@@ -79,6 +82,29 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.proto == 'true' }}
     uses: ./.github/workflows/reusable-proto.yml
+
+  openapi-check:
+    needs: changes
+    if: ${{ needs.changes.outputs.openapi == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (head)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Checkout (base)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+          persist-credentials: false
+
+      - name: Check for breaking OpenAPI changes
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/specs \
+            tufin/oasdiff:latest \
+            breaking /specs/base/api/openapi.yaml /specs/api/openapi.yaml
 
   build-binaries:
     needs: [lint, unit-tests]
