@@ -82,11 +82,19 @@ type GameServerSpec struct {
 	Storage struct {
 		Size         string `json:"size,omitempty"`
 		StorageClass string `json:"storageClass,omitempty"`
+		// SnapshotRef restores the server from a GameSnapshot.
+		SnapshotRef *SnapshotRef `json:"snapshotRef,omitempty"`
 	} `json:"storage,omitempty"`
 	Lifecycle struct {
 		IdleTimeoutSeconds int32 `json:"idleTimeoutSeconds,omitempty"`
 		AutoStart          bool  `json:"autoStart,omitempty"`
 	} `json:"lifecycle,omitempty"`
+}
+
+// SnapshotRef references a snapshot to restore a GameServer from.
+type SnapshotRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // Endpoint is a published network endpoint of a GameServer.
@@ -160,6 +168,23 @@ type ActionExecutionRef struct {
 	Name string `json:"name"`
 }
 
+// ActionExecution is the status of a dispatched action.
+type ActionExecution struct {
+	Metadata ObjectMeta `json:"metadata"`
+	Spec     struct {
+		ActionName string            `json:"actionName"`
+		Caller     string            `json:"caller"`
+		Params     map[string]string `json:"params,omitempty"`
+	} `json:"spec"`
+	Status struct {
+		State       string     `json:"state,omitempty"`
+		Result      string     `json:"result,omitempty"`
+		Error       string     `json:"error,omitempty"`
+		StartedAt   *time.Time `json:"startedAt,omitempty"`
+		CompletedAt *time.Time `json:"completedAt,omitempty"`
+	} `json:"status"`
+}
+
 // GameSnapshot is a point-in-time copy of a GameServer's data.
 type GameSnapshot struct {
 	Metadata ObjectMeta `json:"metadata"`
@@ -196,10 +221,19 @@ func toGenGameServer(gs *GameServer) gen.GameServer {
 	if gs.Metadata.Labels != nil {
 		out.Metadata.Labels = &gs.Metadata.Labels
 	}
-	if gs.Spec.Storage.Size != "" || gs.Spec.Storage.StorageClass != "" {
+	if gs.Spec.Storage.Size != "" || gs.Spec.Storage.StorageClass != "" || gs.Spec.Storage.SnapshotRef != nil {
 		out.Spec.Storage = &gen.StorageSpec{
 			Size:         ptrOrNil(gs.Spec.Storage.Size),
 			StorageClass: ptrOrNil(gs.Spec.Storage.StorageClass),
+		}
+		if gs.Spec.Storage.SnapshotRef != nil {
+			out.Spec.Storage.SnapshotRef = &struct {
+				Name      *string `json:"name,omitempty"`
+				Namespace *string `json:"namespace,omitempty"`
+			}{
+				Name:      &gs.Spec.Storage.SnapshotRef.Name,
+				Namespace: ptrOrNil(gs.Spec.Storage.SnapshotRef.Namespace),
+			}
 		}
 	}
 	if gs.Spec.Lifecycle.AutoStart || gs.Spec.Lifecycle.IdleTimeoutSeconds != 0 {
@@ -237,6 +271,12 @@ func fromGenGameServer(in *gen.GameServer) GameServer {
 		if in.Spec.Storage != nil {
 			out.Spec.Storage.Size = deref(in.Spec.Storage.Size)
 			out.Spec.Storage.StorageClass = deref(in.Spec.Storage.StorageClass)
+			if in.Spec.Storage.SnapshotRef != nil {
+				out.Spec.Storage.SnapshotRef = &SnapshotRef{
+					Name:      deref(in.Spec.Storage.SnapshotRef.Name),
+					Namespace: deref(in.Spec.Storage.SnapshotRef.Namespace),
+				}
+			}
 		}
 		if in.Spec.Lifecycle != nil {
 			if in.Spec.Lifecycle.AutoStart != nil {
@@ -436,6 +476,40 @@ func (c *Client) ExecuteAction(ctx context.Context, namespace, name, action stri
 		return nil, apiError(resp.StatusCode(), resp.Body)
 	}
 	return &ActionExecutionRef{Name: resp.JSON201.Name}, nil
+}
+
+func (c *Client) GetActionExecution(ctx context.Context, namespace, name, executionID string) (*ActionExecution, error) {
+	resp, err := c.inner.GetActionExecutionWithResponse(ctx, namespace, name, executionID)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return nil, apiError(resp.StatusCode(), resp.Body)
+	}
+	out := &ActionExecution{}
+	in := resp.JSON200
+	if in.Metadata != nil {
+		out.Metadata.Name = deref(in.Metadata.Name)
+		out.Metadata.Namespace = deref(in.Metadata.Namespace)
+		if in.Metadata.Labels != nil {
+			out.Metadata.Labels = *in.Metadata.Labels
+		}
+	}
+	if in.Spec != nil {
+		out.Spec.ActionName = deref(in.Spec.ActionName)
+		out.Spec.Caller = deref(in.Spec.Caller)
+		if in.Spec.Params != nil {
+			out.Spec.Params = *in.Spec.Params
+		}
+	}
+	if in.Status != nil {
+		out.Status.State = deref((*string)(in.Status.State))
+		out.Status.Result = deref(in.Status.Result)
+		out.Status.Error = deref(in.Status.Error)
+		out.Status.StartedAt = in.Status.StartedAt
+		out.Status.CompletedAt = in.Status.CompletedAt
+	}
+	return out, nil
 }
 
 // Snapshots

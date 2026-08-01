@@ -104,6 +104,12 @@ func TestBuildGameServerPodSpec(t *testing.T) {
 	if agentEnv["minato_GAME_CONTAINER"] != GameContainerName {
 		t.Fatalf("expected minato_GAME_CONTAINER, got %q", agentEnv["minato_GAME_CONTAINER"])
 	}
+	if agentEnv["EULA"] != "true" {
+		t.Fatalf("expected game env forwarded to agent, got %q", agentEnv["EULA"])
+	}
+	if agentEnv["CUSTOM"] != "custom" {
+		t.Fatalf("expected server env forwarded to agent, got %q", agentEnv["CUSTOM"])
+	}
 
 	env := map[string]string{}
 	for _, item := range game.Env {

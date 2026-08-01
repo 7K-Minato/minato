@@ -56,11 +56,13 @@ func BuildGameServerPodSpecWithPullSecrets(profile *operatorv1.GameProfile, serv
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
-		Env: []corev1.EnvVar{
-			{Name: "minato_GAMESERVER_NAME", Value: server.Name},
-			{Name: "minato_GAMESERVER_NAMESPACE", Value: server.Namespace},
-			{Name: "minato_GAME_CONTAINER", Value: GameContainerName},
-		},
+		// The agent sees the same game environment (plus its own minato_* vars) —
+		// agents typically need game config such as RCON credentials.
+		Env: append(gameEnv,
+			corev1.EnvVar{Name: "minato_GAMESERVER_NAME", Value: server.Name},
+			corev1.EnvVar{Name: "minato_GAMESERVER_NAMESPACE", Value: server.Namespace},
+			corev1.EnvVar{Name: "minato_GAME_CONTAINER", Value: GameContainerName},
+		),
 		VolumeMounts: buildDataVolumeMounts(profile),
 	}
 
