@@ -880,6 +880,23 @@ components:
               type: boolean
             restoreFromSnapshot:
               type: boolean
+        observability:
+          type: object
+          properties:
+            agentMetrics:
+              type: object
+              properties:
+                port:
+                  type: integer
+                path:
+                  type: string
+            serviceMonitor:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                interval:
+                  type: string
 
     Port:
       type: object
@@ -902,6 +919,8 @@ components:
           type: string
         required:
           type: boolean
+        description:
+          type: string
 
     APIKey:
       type: object

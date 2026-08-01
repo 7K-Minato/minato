@@ -63,6 +63,10 @@ type EnvironmentSpec struct {
 	// required indicates whether this env var must be provided.
 	// +optional
 	Required bool `json:"required,omitempty"`
+
+	// description explains what this env var controls, shown to users.
+	// +optional
+	Description string `json:"description,omitempty"`
 }
 
 // StorageSpec defines minimal storage configuration.
@@ -93,6 +97,39 @@ type CapabilitiesSpec struct {
 	// restoreFromSnapshot enables restoring from a snapshot.
 	// +optional
 	RestoreFromSnapshot bool `json:"restoreFromSnapshot,omitempty"`
+}
+
+// AgentMetricsSpec configures metrics exposed by the game agent.
+type AgentMetricsSpec struct {
+	// port is the agent metrics port.
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// path is the agent metrics path.
+	// +optional
+	Path string `json:"path,omitempty"`
+}
+
+// ServiceMonitorSpec configures Prometheus ServiceMonitor creation.
+type ServiceMonitorSpec struct {
+	// enabled controls whether a ServiceMonitor is created for the game server.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// interval is the scrape interval.
+	// +optional
+	Interval string `json:"interval,omitempty"`
+}
+
+// ObservabilitySpec defines metrics and monitoring configuration for a game profile.
+type ObservabilitySpec struct {
+	// agentMetrics configures the agent's metrics endpoint.
+	// +optional
+	AgentMetrics *AgentMetricsSpec `json:"agentMetrics,omitempty"`
+
+	// serviceMonitor configures ServiceMonitor creation for game servers.
+	// +optional
+	ServiceMonitor *ServiceMonitorSpec `json:"serviceMonitor,omitempty"`
 }
 
 // GameProfileSpec defines the desired state of GameProfile
@@ -136,6 +173,10 @@ type GameProfileSpec struct {
 	// capabilities defines optional sidecar capabilities.
 	// +optional
 	Capabilities *CapabilitiesSpec `json:"capabilities,omitempty"`
+
+	// observability defines metrics and monitoring configuration.
+	// +optional
+	Observability *ObservabilitySpec `json:"observability,omitempty"`
 }
 
 // GameProfileStatus defines the observed state of GameProfile.

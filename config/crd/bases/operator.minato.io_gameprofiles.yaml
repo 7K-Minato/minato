@@ -129,6 +129,10 @@ spec:
                     default:
                       description: default is the default value if not provided.
                       type: string
+                    description:
+                      description: description explains what this env var controls,
+                        shown to users.
+                      type: string
                     key:
                       description: key is the environment variable name.
                       type: string
@@ -147,6 +151,33 @@ spec:
                 description: imagePullPolicy is the pull policy for the game container
                   image.
                 type: string
+              observability:
+                description: observability defines metrics and monitoring configuration.
+                properties:
+                  agentMetrics:
+                    description: agentMetrics configures the agent's metrics endpoint.
+                    properties:
+                      path:
+                        description: path is the agent metrics path.
+                        type: string
+                      port:
+                        description: port is the agent metrics port.
+                        format: int32
+                        type: integer
+                    type: object
+                  serviceMonitor:
+                    description: serviceMonitor configures ServiceMonitor creation
+                      for game servers.
+                    properties:
+                      enabled:
+                        description: enabled controls whether a ServiceMonitor is
+                          created for the game server.
+                        type: boolean
+                      interval:
+                        description: interval is the scrape interval.
+                        type: string
+                    type: object
+                type: object
               ports:
                 description: ports defines the game ports.
                 items:

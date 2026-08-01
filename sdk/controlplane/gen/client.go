@@ -210,9 +210,10 @@ type Endpoint struct {
 
 // EnvVar defines model for EnvVar.
 type EnvVar struct {
-	Default  *string `json:"default,omitempty"`
-	Key      *string `json:"key,omitempty"`
-	Required *bool   `json:"required,omitempty"`
+	Default     *string `json:"default,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Key         *string `json:"key,omitempty"`
+	Required    *bool   `json:"required,omitempty"`
 }
 
 // Error defines model for Error.
@@ -245,7 +246,17 @@ type GameProfileSpec struct {
 	Environment *[]EnvVar `json:"environment,omitempty"`
 
 	// Image Game server container image
-	Image     *string `json:"image,omitempty"`
+	Image         *string `json:"image,omitempty"`
+	Observability *struct {
+		AgentMetrics *struct {
+			Path *string `json:"path,omitempty"`
+			Port *int    `json:"port,omitempty"`
+		} `json:"agentMetrics,omitempty"`
+		ServiceMonitor *struct {
+			Enabled  *bool   `json:"enabled,omitempty"`
+			Interval *string `json:"interval,omitempty"`
+		} `json:"serviceMonitor,omitempty"`
+	} `json:"observability,omitempty"`
 	Ports     *[]Port `json:"ports,omitempty"`
 	Resources *struct {
 		Limits *struct {
