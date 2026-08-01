@@ -55,7 +55,18 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(30 * time.Second))
+	// A global timeout breaks long-lived WebSocket connections and strips
+	// Hijacker support; skip it for the console route.
+	timeout := middleware.Timeout(30 * time.Second)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/console") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			timeout(next).ServeHTTP(w, r)
+		})
+	})
 	r.Use(securityHeadersMiddleware)
 	r.Use(middleware.RequestSize(10 * 1024 * 1024)) // 10MB max request size
 	r.Use(audit.Middleware())

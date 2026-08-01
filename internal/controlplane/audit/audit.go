@@ -2,7 +2,10 @@
 package audit
 
 import (
+	"bufio"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -92,4 +95,14 @@ type responseWriter struct {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack passes through to the underlying writer so WebSocket upgrades work
+// behind the audit middleware (gorilla's upgrader asserts http.Hijacker).
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := rw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("hijack not supported")
+	}
+	return h.Hijack()
 }
