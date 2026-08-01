@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -175,6 +177,20 @@ func (api *controlPlaneAPI) CreateGameServer(w http.ResponseWriter, r *http.Requ
 	var server operatorv1.GameServer
 	if err := json.NewDecoder(r.Body).Decode(&server); err != nil {
 		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// Ensure the target namespace exists; tenants land in their own namespace
+	// which may not have been provisioned ahead of time.
+	ns := &corev1.Namespace{}
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: namespace}, ns); apierrors.IsNotFound(err) {
+		ns = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		if err := api.client.Create(r.Context(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	} else if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 

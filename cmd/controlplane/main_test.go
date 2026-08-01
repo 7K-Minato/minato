@@ -256,6 +256,32 @@ func TestCreateGameServer_InternalError(t *testing.T) {
 }
 
 // deleteGameServer
+func TestCreateGameServer_CreatesNamespace(t *testing.T) {
+	api, c := setupTestAPI()
+	r := newRouter(api)
+
+	gs := operatorv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "gs-new"},
+		Spec:       operatorv1.GameServerSpec{Profile: "minecraft"},
+	}
+	body, _ := json.Marshal(gs)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/gameservers/tenant-new", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var ns corev1.Namespace
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "tenant-new"}, &ns); err != nil {
+		t.Fatalf("expected namespace to be auto-created: %v", err)
+	}
+}
+
+// deleteGameServer
 func TestDeleteGameServer_Success(t *testing.T) {
 	gs := &operatorv1.GameServer{
 		ObjectMeta: metav1.ObjectMeta{Name: "gs1", Namespace: "default"},
