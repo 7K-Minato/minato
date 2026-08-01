@@ -23,6 +23,7 @@ spec:
         {{- include "minato.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: controlplane
     spec:
+      serviceAccountName: {{ include "minato.serviceAccountName" . }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
