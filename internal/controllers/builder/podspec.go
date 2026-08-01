@@ -18,6 +18,13 @@ const (
 )
 
 func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.GameServer) (corev1.PodSpec, error) {
+	return BuildGameServerPodSpecWithPullSecrets(profile, server, nil)
+}
+
+// BuildGameServerPodSpecWithPullSecrets builds the pod spec for a GameServer,
+// attaching the given image pull secrets (by name, must exist in the
+// GameServer's namespace) to the pod.
+func BuildGameServerPodSpecWithPullSecrets(profile *operatorv1.GameProfile, server *operatorv1.GameServer, pullSecrets []string) (corev1.PodSpec, error) {
 	if profile.Spec.Storage.MountPath == "" {
 		return corev1.PodSpec{}, fmt.Errorf("storage.mountPath is required")
 	}
@@ -59,6 +66,10 @@ func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.
 
 	podSpec := corev1.PodSpec{
 		Containers: []corev1.Container{gameContainer, agentContainer},
+	}
+
+	for _, name := range pullSecrets {
+		podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: name})
 	}
 
 	if server.Spec.PriorityClassName != "" {

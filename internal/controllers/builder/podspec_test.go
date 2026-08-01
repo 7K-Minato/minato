@@ -119,3 +119,32 @@ func TestBuildGameServerPodSpec(t *testing.T) {
 		t.Fatalf("expected CUSTOM env, got %q", env["CUSTOM"])
 	}
 }
+
+func TestBuildGameServerPodSpecWithPullSecrets(t *testing.T) {
+	profile := &operatorv1.GameProfile{
+		Spec: operatorv1.GameProfileSpec{
+			Image:   "game:latest",
+			Storage: operatorv1.StorageSpec{MountPath: "/data", SizeDefault: "1Gi"},
+			Agent:   operatorv1.AgentSpec{Image: "agent:latest"},
+		},
+	}
+	server := &operatorv1.GameServer{}
+
+	podSpec, err := BuildGameServerPodSpecWithPullSecrets(profile, server, []string{"harbor-docker-pull", "other"})
+	if err != nil {
+		t.Fatalf("BuildGameServerPodSpecWithPullSecrets returned error: %v", err)
+	}
+	if len(podSpec.ImagePullSecrets) != 2 ||
+		podSpec.ImagePullSecrets[0].Name != "harbor-docker-pull" ||
+		podSpec.ImagePullSecrets[1].Name != "other" {
+		t.Fatalf("unexpected imagePullSecrets: %#v", podSpec.ImagePullSecrets)
+	}
+
+	podSpec, err = BuildGameServerPodSpec(profile, server)
+	if err != nil {
+		t.Fatalf("BuildGameServerPodSpec returned error: %v", err)
+	}
+	if len(podSpec.ImagePullSecrets) != 0 {
+		t.Fatalf("expected no imagePullSecrets, got %#v", podSpec.ImagePullSecrets)
+	}
+}

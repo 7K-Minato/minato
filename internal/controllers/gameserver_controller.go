@@ -46,6 +46,14 @@ const (
 type GameServerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	// OperatorNamespace is where the operator runs; image pull secrets are
+	// copied from here into GameServer namespaces.
+	OperatorNamespace string
+	// ImagePullSecrets are secret names to attach to game server pods. Each
+	// must exist in OperatorNamespace; the reconciler replicates them into
+	// the GameServer's namespace.
+	ImagePullSecrets []string
 }
 
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch;create;update;patch;delete
@@ -108,7 +116,11 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	podSpec, err := builder.BuildGameServerPodSpec(profile, server)
+	if err := r.ensureImagePullSecrets(ctx, server.Namespace); err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensure image pull secrets: %w", err)
+	}
+
+	podSpec, err := builder.BuildGameServerPodSpecWithPullSecrets(profile, server, r.ImagePullSecrets)
 	if err != nil {
 		r.setProfileMissingCondition(ctx, server, err)
 		return ctrl.Result{}, err
@@ -185,8 +197,52 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *GameServerReconciler) setProfileMissingCondition(
-	ctx context.Context,
+// ensureImagePullSecrets replicates the configured image pull secrets from the
+// operator's namespace into the target namespace so game server pods can pull
+// private images.
+func (r *GameServerReconciler) ensureImagePullSecrets(ctx context.Context, namespace string) error {
+	if len(r.ImagePullSecrets) == 0 || r.OperatorNamespace == "" || namespace == r.OperatorNamespace {
+		return nil
+	}
+	for _, name := range r.ImagePullSecrets {
+		src := &corev1.Secret{}
+		if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: r.OperatorNamespace}, src); err != nil {
+			return fmt.Errorf("get pull secret %s/%s: %w", r.OperatorNamespace, name, err)
+		}
+
+		dst := &corev1.Secret{}
+		err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, dst)
+		switch {
+		case apierrors.IsNotFound(err):
+			dst = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+					Labels:    map[string]string{"minato.io/replicated-from": r.OperatorNamespace},
+				},
+				Type: src.Type,
+				Data: src.Data,
+			}
+			if err := r.Create(ctx, dst); err != nil && !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("replicate pull secret to %s: %w", namespace, err)
+			}
+		case err != nil:
+			return err
+		default:
+			if dst.Labels["minato.io/replicated-from"] == "" {
+				continue // not managed by us; leave user-provided secret alone
+			}
+			dst.Type = src.Type
+			dst.Data = src.Data
+			if err := r.Update(ctx, dst); err != nil {
+				return fmt.Errorf("refresh pull secret in %s: %w", namespace, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *GameServerReconciler) setProfileMissingCondition(ctx context.Context,
 	server *operatorv1.GameServer,
 	err error,
 ) {

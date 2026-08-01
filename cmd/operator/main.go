@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -170,7 +171,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	gsr := &controllers.GameServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	var pullSecrets []string
+	if v := os.Getenv("IMAGE_PULL_SECRETS"); v != "" {
+		for name := range strings.SplitSeq(v, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				pullSecrets = append(pullSecrets, name)
+			}
+		}
+	}
+	gsr := &controllers.GameServerReconciler{
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		OperatorNamespace: os.Getenv("POD_NAMESPACE"),
+		ImagePullSecrets:  pullSecrets,
+	}
 	if err := gsr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServer")
 		os.Exit(1)

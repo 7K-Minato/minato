@@ -675,3 +675,70 @@ func TestGameServerReconciler_Reconcile_ServiceMonitorCreated(t *testing.T) {
 
 // Helper to import ctrl.Request without unused import issues.
 var _ = ctrl.Request{}
+
+func TestEnsureImagePullSecrets(t *testing.T) {
+	src := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "harbor-docker-pull", Namespace: "minato"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"auths":{}}`)},
+	}
+
+	newReconciler := func(objs ...client.Object) *GameServerReconciler {
+		c := fake.NewClientBuilder().WithScheme(newTestScheme()).WithObjects(objs...).Build()
+		return &GameServerReconciler{
+			Client:            c,
+			Scheme:            newTestScheme(),
+			OperatorNamespace: "minato",
+			ImagePullSecrets:  []string{"harbor-docker-pull"},
+		}
+	}
+
+	t.Run("copies secret into target namespace", func(t *testing.T) {
+		r := newReconciler(src)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+
+		dst := &corev1.Secret{}
+		require.NoError(t, r.Get(context.Background(), types.NamespacedName{Name: "harbor-docker-pull", Namespace: "tenant-1"}, dst))
+		assert.Equal(t, src.Data, dst.Data)
+		assert.Equal(t, "minato", dst.Labels["minato.io/replicated-from"])
+	})
+
+	t.Run("leaves user-provided secret alone", func(t *testing.T) {
+		own := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "harbor-docker-pull", Namespace: "tenant-1"},
+			Data:       map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"custom":true}`)},
+		}
+		r := newReconciler(src, own)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+
+		dst := &corev1.Secret{}
+		require.NoError(t, r.Get(context.Background(), types.NamespacedName{Name: "harbor-docker-pull", Namespace: "tenant-1"}, dst))
+		assert.Equal(t, own.Data, dst.Data)
+	})
+
+	t.Run("refreshes managed copy", func(t *testing.T) {
+		stale := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "harbor-docker-pull", Namespace: "tenant-1",
+				Labels: map[string]string{"minato.io/replicated-from": "minato"},
+			},
+			Data: map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"stale":true}`)},
+		}
+		r := newReconciler(src, stale)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+
+		dst := &corev1.Secret{}
+		require.NoError(t, r.Get(context.Background(), types.NamespacedName{Name: "harbor-docker-pull", Namespace: "tenant-1"}, dst))
+		assert.Equal(t, src.Data, dst.Data)
+	})
+
+	t.Run("no-op in operator namespace", func(t *testing.T) {
+		r := newReconciler(src)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "minato"))
+	})
+
+	t.Run("missing source secret errors", func(t *testing.T) {
+		r := newReconciler()
+		require.Error(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+	})
+}

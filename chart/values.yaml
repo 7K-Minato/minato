@@ -22,6 +22,11 @@ operator:
     pullPolicy: IfNotPresent
   
   replicas: 2
+
+  # imagePullSecrets lists secret names to attach to game server pods. Each must
+  # exist in the operator's namespace; the operator replicates them into every
+  # GameServer namespace automatically.
+  imagePullSecrets: []
   
   resources:
     limits:
