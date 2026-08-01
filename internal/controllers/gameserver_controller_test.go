@@ -408,20 +408,39 @@ func TestGameServerReconciler_UpdateStatus(t *testing.T) {
 	scheme := newTestScheme()
 	ctx := context.Background()
 	server := newTestGameServer()
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).WithStatusSubresource(&operatorv1.GameServer{}).Build()
+	profile := newTestProfile()
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-0", Namespace: server.Namespace},
+		Status:     corev1.PodStatus{PodIP: "10.42.1.50"},
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, pod).WithStatusSubresource(&operatorv1.GameServer{}).Build()
 	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
 
-	err := reconciler.updateStatus(ctx, server, true)
+	err := reconciler.updateStatus(ctx, server, profile, true)
 	require.NoError(t, err)
 	assert.Equal(t, stateRunning, server.Status.State)
 	assert.Len(t, server.Status.Conditions, 2)
 	assert.Equal(t, metav1.ConditionTrue, server.Status.Conditions[0].Status)
 	assert.Equal(t, "AgentReachable", server.Status.Conditions[1].Type)
 
-	err = reconciler.updateStatus(ctx, server, false)
+	require.Len(t, server.Status.Endpoints, len(profile.Spec.Ports))
+	assert.Equal(t, "10.42.1.50", server.Status.Endpoints[0].Address)
+	assert.Equal(t, profile.Spec.Ports[0].ContainerPort, server.Status.Endpoints[0].Port)
+
+	err = reconciler.updateStatus(ctx, server, profile, false)
 	require.NoError(t, err)
 	assert.Equal(t, stateProvisioning, server.Status.State)
 	assert.Equal(t, metav1.ConditionFalse, server.Status.Conditions[0].Status)
+}
+
+func TestGameServerReconciler_ResolveEndpointsNoPod(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
+
+	endpoints := reconciler.resolveEndpoints(context.Background(), server, newTestProfile())
+	assert.Empty(t, endpoints)
 }
 
 func TestGameServerReconciler_UpdateAgentStatus(t *testing.T) {

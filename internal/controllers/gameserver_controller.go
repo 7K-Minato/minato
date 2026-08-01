@@ -169,7 +169,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 	ready := stsReady(currentSts)
-	if err := r.updateStatus(ctx, server, ready); err != nil {
+	if err := r.updateStatus(ctx, server, profile, ready); err != nil {
 		logger.Error(err, "failed to update GameServer status")
 		return ctrl.Result{}, err
 	}
@@ -262,7 +262,7 @@ func (r *GameServerReconciler) setProfileMissingCondition(ctx context.Context,
 	_ = r.Status().Update(ctx, server)
 }
 
-func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operatorv1.GameServer, ready bool) error {
+func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operatorv1.GameServer, profile *operatorv1.GameProfile, ready bool) error {
 	state := stateProvisioning
 	if ready {
 		state = stateRunning
@@ -289,10 +289,32 @@ func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operato
 
 	server.Status.State = state
 	server.Status.AgentVersion = ""
+	server.Status.Endpoints = r.resolveEndpoints(ctx, server, profile)
 	setCondition(&server.Status.Conditions, readyCondition)
 	setCondition(&server.Status.Conditions, agentCondition)
 
 	return r.Status().Update(ctx, server)
+}
+
+// resolveEndpoints maps the profile's ports to the game server pod's current
+// IP so clients know where to reach the server.
+func (r *GameServerReconciler) resolveEndpoints(ctx context.Context, server *operatorv1.GameServer, profile *operatorv1.GameProfile) []operatorv1.Endpoint {
+	pod := &corev1.Pod{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name + "-0", Namespace: server.Namespace}, pod); err != nil {
+		return nil
+	}
+	if pod.Status.PodIP == "" {
+		return nil
+	}
+	endpoints := make([]operatorv1.Endpoint, 0, len(profile.Spec.Ports))
+	for _, p := range profile.Spec.Ports {
+		endpoints = append(endpoints, operatorv1.Endpoint{
+			Name:    p.Name,
+			Address: pod.Status.PodIP,
+			Port:    p.ContainerPort,
+		})
+	}
+	return endpoints
 }
 
 func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *operatorv1.GameServer) error {
