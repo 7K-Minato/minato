@@ -48,6 +48,17 @@ type PortSpec struct {
 	// protocol for this port (TCP or UDP).
 	// +optional
 	Protocol corev1.Protocol `json:"protocol,omitempty"`
+
+	// exposed controls whether this port is published on the external
+	// (LoadBalancer) game service. Internal ports like RCON should set this
+	// to false. Defaults to true.
+	// +optional
+	Exposed *bool `json:"exposed,omitempty"`
+}
+
+// ExposedPort reports whether the port belongs on the external game service.
+func (p PortSpec) ExposedPort() bool {
+	return p.Exposed == nil || *p.Exposed
 }
 
 // EnvironmentSpec defines a configurable environment variable.

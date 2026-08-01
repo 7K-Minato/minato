@@ -409,11 +409,15 @@ func TestGameServerReconciler_UpdateStatus(t *testing.T) {
 	ctx := context.Background()
 	server := newTestGameServer()
 	profile := newTestProfile()
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-0", Namespace: server.Namespace},
-		Status:     corev1.PodStatus{PodIP: "10.42.1.50"},
+	gameSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace},
+		Status: corev1.ServiceStatus{
+			LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{{IP: "10.0.0.50"}},
+			},
+		},
 	}
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, pod).WithStatusSubresource(&operatorv1.GameServer{}).Build()
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, gameSvc).WithStatusSubresource(&operatorv1.GameServer{}).Build()
 	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
 
 	err := reconciler.updateStatus(ctx, server, profile, true)
@@ -424,7 +428,7 @@ func TestGameServerReconciler_UpdateStatus(t *testing.T) {
 	assert.Equal(t, "AgentReachable", server.Status.Conditions[1].Type)
 
 	require.Len(t, server.Status.Endpoints, len(profile.Spec.Ports))
-	assert.Equal(t, "10.42.1.50", server.Status.Endpoints[0].Address)
+	assert.Equal(t, "10.0.0.50", server.Status.Endpoints[0].Address)
 	assert.Equal(t, profile.Spec.Ports[0].ContainerPort, server.Status.Endpoints[0].Port)
 
 	err = reconciler.updateStatus(ctx, server, profile, false)
@@ -433,14 +437,61 @@ func TestGameServerReconciler_UpdateStatus(t *testing.T) {
 	assert.Equal(t, metav1.ConditionFalse, server.Status.Conditions[0].Status)
 }
 
-func TestGameServerReconciler_ResolveEndpointsNoPod(t *testing.T) {
+func TestGameServerReconciler_ResolveEndpointsPendingLB(t *testing.T) {
 	scheme := newTestScheme()
 	server := newTestGameServer()
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).Build()
+	// Service exists but no ingress assigned yet.
+	gameSvc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace}}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, gameSvc).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
+
+	assert.Empty(t, reconciler.resolveEndpoints(context.Background(), server, newTestProfile()))
+}
+
+func TestGameServerReconciler_ResolveEndpointsHostname(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	gameSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace},
+		Status: corev1.ServiceStatus{
+			LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{{Hostname: "mc-1.games.example.com"}},
+			},
+		},
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, gameSvc).Build()
 	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
 
 	endpoints := reconciler.resolveEndpoints(context.Background(), server, newTestProfile())
-	assert.Empty(t, endpoints)
+	require.Len(t, endpoints, len(newTestProfile().Spec.Ports))
+	assert.Equal(t, "mc-1.games.example.com", endpoints[0].Address)
+}
+
+func TestBuildGameService(t *testing.T) {
+	server := newTestGameServer()
+	profile := newTestProfile()
+	labels := buildGameServerLabels(server, profile)
+
+	svc := buildGameService(server, profile, labels)
+	assert.Equal(t, corev1.ServiceTypeLoadBalancer, svc.Spec.Type)
+	assert.Equal(t, server.Name+"-game", svc.Name)
+	assert.Equal(t, labels, svc.Spec.Selector)
+	require.Len(t, svc.Spec.Ports, len(profile.Spec.Ports))
+	assert.Equal(t, int32(25565), svc.Spec.Ports[0].Port)
+
+	// rcon excluded via exposed:false
+	hidden := false
+	profile.Spec.Ports = append(profile.Spec.Ports,
+		operatorv1.PortSpec{Name: "rcon", ContainerPort: 25575, Protocol: corev1.ProtocolTCP, Exposed: &hidden},
+		operatorv1.PortSpec{Name: "game-dup", ContainerPort: 25565, Protocol: corev1.ProtocolTCP},
+	)
+	svc = buildGameService(server, profile, labels)
+	names := []string{}
+	for _, p := range svc.Spec.Ports {
+		names = append(names, p.Name)
+	}
+	assert.NotContains(t, names, "rcon")
+	assert.NotContains(t, names, "game-dup", "duplicate port+protocol must be deduped")
 }
 
 func TestGameServerReconciler_UpdateAgentStatus(t *testing.T) {

@@ -155,6 +155,15 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	// LoadBalancer service for player traffic (external IP via MetalLB etc.)
+	gameSvc := buildGameService(server, profile, labelsMap)
+	if err := controllerutil.SetControllerReference(server, gameSvc, r.Scheme); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, gameSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	pvc := buildPVC(server, profile)
 	if err := controllerutil.SetControllerReference(server, pvc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
@@ -296,21 +305,34 @@ func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operato
 	return r.Status().Update(ctx, server)
 }
 
-// resolveEndpoints maps the profile's ports to the game server pod's current
-// IP so clients know where to reach the server.
+// resolveEndpoints maps exposed profile ports to the external address of the
+// game server's LoadBalancer service. Empty until the load balancer assigns
+// an ingress address — pod IPs are never published.
 func (r *GameServerReconciler) resolveEndpoints(ctx context.Context, server *operatorv1.GameServer, profile *operatorv1.GameProfile) []operatorv1.Endpoint {
-	pod := &corev1.Pod{}
-	if err := r.Get(ctx, types.NamespacedName{Name: server.Name + "-0", Namespace: server.Namespace}, pod); err != nil {
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name + "-game", Namespace: server.Namespace}, svc); err != nil {
 		return nil
 	}
-	if pod.Status.PodIP == "" {
+	if len(svc.Status.LoadBalancer.Ingress) == 0 {
 		return nil
 	}
+	ingress := svc.Status.LoadBalancer.Ingress[0]
+	address := ingress.IP
+	if address == "" {
+		address = ingress.Hostname
+	}
+	if address == "" {
+		return nil
+	}
+
 	endpoints := make([]operatorv1.Endpoint, 0, len(profile.Spec.Ports))
 	for _, p := range profile.Spec.Ports {
+		if !p.ExposedPort() {
+			continue
+		}
 		endpoints = append(endpoints, operatorv1.Endpoint{
 			Name:    p.Name,
-			Address: pod.Status.PodIP,
+			Address: address,
 			Port:    p.ContainerPort,
 		})
 	}
@@ -330,6 +352,11 @@ func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *ope
 
 	agentSvc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-agent", Namespace: server.Namespace}}
 	if err := r.Delete(ctx, agentSvc); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	gameSvc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace}}
+	if err := r.Delete(ctx, gameSvc); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -586,6 +613,57 @@ func buildHeadlessService(
 				},
 			},
 			PublishNotReadyAddresses: true, // Allow DNS resolution even before pod is ready
+		},
+	}
+}
+
+// buildGameService creates the player-facing LoadBalancer Service for a game
+// server. One service port per exposed profile port; the external IP is
+// assigned by the cluster's load balancer (e.g. MetalLB) and surfaced via
+// status.endpoints.
+func buildGameService(
+	server *operatorv1.GameServer,
+	profile *operatorv1.GameProfile,
+	labelsMap map[string]string,
+) *corev1.Service {
+	type protoPort struct {
+		port     int32
+		protocol corev1.Protocol
+	}
+	seen := map[protoPort]bool{}
+	ports := []corev1.ServicePort{}
+	for _, p := range profile.Spec.Ports {
+		if !p.ExposedPort() {
+			continue
+		}
+		protocol := p.Protocol
+		if protocol == "" {
+			protocol = corev1.ProtocolTCP
+		}
+		key := protoPort{p.ContainerPort, protocol}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		ports = append(ports, corev1.ServicePort{
+			Name:       p.Name,
+			Port:       p.ContainerPort,
+			TargetPort: intstr.FromInt32(p.ContainerPort),
+			Protocol:   protocol,
+		})
+	}
+
+	return &corev1.Service{
+		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name + "-game",
+			Namespace: server.Namespace,
+			Labels:    labelsMap,
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeLoadBalancer,
+			Selector: labelsMap,
+			Ports:    ports,
 		},
 	}
 }

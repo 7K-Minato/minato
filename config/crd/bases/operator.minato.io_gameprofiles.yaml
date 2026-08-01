@@ -187,6 +187,12 @@ spec:
                       description: containerPort is the port exposed by the container.
                       format: int32
                       type: integer
+                    exposed:
+                      description: |-
+                        exposed controls whether this port is published on the external
+                        (LoadBalancer) game service. Internal ports like RCON should set this
+                        to false. Defaults to true.
+                      type: boolean
                     name:
                       description: name is a friendly port name.
                       type: string

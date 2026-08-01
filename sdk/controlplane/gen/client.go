@@ -382,9 +382,12 @@ type ObjectMeta struct {
 
 // Port defines model for Port.
 type Port struct {
-	ContainerPort *int          `json:"containerPort,omitempty"`
-	Name          *string       `json:"name,omitempty"`
-	Protocol      *PortProtocol `json:"protocol,omitempty"`
+	ContainerPort *int `json:"containerPort,omitempty"`
+
+	// Exposed Whether this port is published on the external LoadBalancer service
+	Exposed  *bool         `json:"exposed,omitempty"`
+	Name     *string       `json:"name,omitempty"`
+	Protocol *PortProtocol `json:"protocol,omitempty"`
 }
 
 // PortProtocol defines model for Port.Protocol.
