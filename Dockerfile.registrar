@@ -1,0 +1,21 @@
+# Build the registrar binary
+FROM golang:1.26.4 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+COPY cmd/registrar/ cmd/registrar/
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o registrar ./cmd/registrar
+
+# Use distroless as minimal base image to package the registrar binary
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY --from=builder /workspace/registrar .
+USER 65532:65532
+
+ENTRYPOINT ["/registrar"]

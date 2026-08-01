@@ -231,3 +231,35 @@ global:
 # Testing
 tests:
   enabled: true
+
+registrar:
+  # Registers this cluster with minato cloud and keeps it alive via heartbeats.
+  enabled: false
+  image:
+    repository: harbor.7kgroup.org/7kminato/minato-registrar
+    tag: ""
+    pullPolicy: IfNotPresent
+  # cloudUrl is the minato cloud API base URL (required when enabled).
+  cloudUrl: ""
+  # clusterName is the fleet-wide unique name of this cluster (required when enabled).
+  clusterName: ""
+  region: ""
+  capacityMax: 100
+  heartbeatInterval: 30s
+  # controlplaneUrl defaults to the in-cluster control plane service.
+  controlplaneUrl: ""
+  dedicatedTenantId: ""
+  # Secrets holding the cloud registration token and the control plane API key.
+  registerTokenSecret:
+    name: minato-registrar
+    key: register-token
+  controlplaneKeySecret:
+    name: minato-registrar
+    key: controlplane-api-key
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi

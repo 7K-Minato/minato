@@ -135,11 +135,13 @@ build-all: ## Build all binaries for current platform.
 docker-build-all: ## Build all Docker images.
 	$(CONTAINER_TOOL) build -t $(IMG) .
 	$(CONTAINER_TOOL) build -t $(IMG)-controlplane -f Dockerfile.controlplane .
+	$(CONTAINER_TOOL) build -t $(IMG)-registrar -f Dockerfile.registrar .
 
 .PHONY: docker-push-all
 docker-push-all: ## Push all Docker images.
 	$(CONTAINER_TOOL) push $(IMG)
 	$(CONTAINER_TOOL) push $(IMG)-controlplane
+	$(CONTAINER_TOOL) push $(IMG)-registrar
 
 .PHONY: helm-lint
 helm-lint: ## Lint the Helm chart.
