@@ -20,16 +20,17 @@ import (
 )
 
 type config struct {
-	CloudURL          string
-	RegisterToken     string
-	Name              string
-	Region            string
-	ControlPlaneURL   string
-	ControlPlaneKey   string
-	CapacityMax       int
-	DedicatedTenantID string
-	HeartbeatInterval time.Duration
-	RequestTimeout    time.Duration
+	CloudURL           string
+	RegisterToken      string
+	Name               string
+	Region             string
+	ControlPlaneURL    string
+	ControlPlaneKey    string
+	CapacityMax        int
+	DedicatedTenantID  string
+	ClusterFingerprint string
+	HeartbeatInterval  time.Duration
+	RequestTimeout     time.Duration
 }
 
 func loadConfig() (config, error) {
@@ -41,6 +42,7 @@ func loadConfig() (config, error) {
 	c.ControlPlaneURL = envStr("CONTROLPLANE_URL", "http://minato-controlplane:8080")
 	c.ControlPlaneKey = os.Getenv("CONTROLPLANE_API_KEY")
 	c.DedicatedTenantID = os.Getenv("DEDICATED_TENANT_ID")
+	c.ClusterFingerprint = os.Getenv("CLUSTER_FINGERPRINT")
 	c.CapacityMax = envInt("CAPACITY_MAX", 100)
 	c.HeartbeatInterval = envDuration("HEARTBEAT_INTERVAL", 30*time.Second)
 	c.RequestTimeout = envDuration("REQUEST_TIMEOUT", 10*time.Second)
@@ -73,8 +75,43 @@ func envDuration(key string, def time.Duration) time.Duration {
 }
 
 type registrar struct {
-	cfg    config
-	client *http.Client
+	cfg         config
+	fingerprint string
+	client      *http.Client
+}
+
+type registerPayload struct {
+	Name               string `json:"name"`
+	Region             string `json:"region"`
+	ControlPlaneURL    string `json:"controlplaneUrl"`
+	APIKey             string `json:"apiKey"`
+	CapacityMax        int    `json:"capacityMax"`
+	DedicatedTenantID  string `json:"dedicatedTenantId"`
+	ClusterFingerprint string `json:"clusterFingerprint,omitempty"`
+}
+
+type heartbeatPayload struct {
+	CapacityMax        int    `json:"capacityMax"`
+	ClusterFingerprint string `json:"clusterFingerprint,omitempty"`
+}
+
+func buildRegisterPayload(cfg config, fingerprint string) registerPayload {
+	return registerPayload{
+		Name:               cfg.Name,
+		Region:             cfg.Region,
+		ControlPlaneURL:    cfg.ControlPlaneURL,
+		APIKey:             cfg.ControlPlaneKey,
+		CapacityMax:        cfg.CapacityMax,
+		DedicatedTenantID:  cfg.DedicatedTenantID,
+		ClusterFingerprint: fingerprint,
+	}
+}
+
+func buildHeartbeatPayload(cfg config, fingerprint string) heartbeatPayload {
+	return heartbeatPayload{
+		CapacityMax:        cfg.CapacityMax,
+		ClusterFingerprint: fingerprint,
+	}
 }
 
 func (r *registrar) call(ctx context.Context, path string, body any) (int, []byte, error) {
@@ -96,14 +133,7 @@ func (r *registrar) call(ctx context.Context, path string, body any) (int, []byt
 }
 
 func (r *registrar) register(ctx context.Context) error {
-	status, body, err := r.call(ctx, "/api/v1/clusters/register", map[string]any{
-		"name":              r.cfg.Name,
-		"region":            r.cfg.Region,
-		"controlplaneUrl":   r.cfg.ControlPlaneURL,
-		"apiKey":            r.cfg.ControlPlaneKey,
-		"capacityMax":       r.cfg.CapacityMax,
-		"dedicatedTenantId": r.cfg.DedicatedTenantID,
-	})
+	status, body, err := r.call(ctx, "/api/v1/clusters/register", buildRegisterPayload(r.cfg, r.fingerprint))
 	if err != nil {
 		return err
 	}
@@ -114,9 +144,7 @@ func (r *registrar) register(ctx context.Context) error {
 }
 
 func (r *registrar) heartbeat(ctx context.Context) (bool, error) {
-	status, body, err := r.call(ctx, "/api/v1/clusters/"+r.cfg.Name+"/heartbeat", map[string]any{
-		"capacityMax": r.cfg.CapacityMax,
-	})
+	status, body, err := r.call(ctx, "/api/v1/clusters/"+r.cfg.Name+"/heartbeat", buildHeartbeatPayload(r.cfg, r.fingerprint))
 	if err != nil {
 		return false, err
 	}
@@ -185,6 +213,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	r := &registrar{cfg: cfg, client: &http.Client{Timeout: cfg.RequestTimeout}}
+	fingerprint := resolveClusterFingerprint(cfg.ClusterFingerprint, defaultTokenPath, defaultCAPath)
+	if fingerprint != "" {
+		log.Printf("cluster fingerprint: %s", fingerprint)
+	}
+
+	r := &registrar{cfg: cfg, fingerprint: fingerprint, client: &http.Client{Timeout: cfg.RequestTimeout}}
 	r.run(ctx)
 }

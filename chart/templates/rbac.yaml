@@ -36,6 +36,13 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "create"]
+  # Control plane tenant namespace hardening (creation-time only)
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["get", "create"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "create"]
   - apiGroups: ["monitoring.coreos.com"]
     resources: ["servicemonitors"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

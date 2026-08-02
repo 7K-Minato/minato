@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +37,7 @@ const (
 	stateProvisioning      = "Provisioning"
 	stateRunning           = "Running"
 	stateIdle              = "Idle"
+	stateStopped           = "Stopped"
 	stateError             = "Error"
 
 	// gRPC timeouts for agent communication
@@ -58,6 +60,10 @@ type GameServerReconciler struct {
 	// external-dns hostname (<server>.<zone>) and publishes that hostname in
 	// status.endpoints instead of the raw IP.
 	ExternalDNSZone string
+	// Recorder emits Kubernetes events (e.g. when ServiceMonitor creation is
+	// skipped because the Prometheus Operator is not installed). May be nil
+	// in tests.
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch;create;update;patch;delete
@@ -132,8 +138,30 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	labelsMap := buildGameServerLabels(server, profile)
 
+	// Lifecycle gate: spec.lifecycle.autoStart=false means the server should
+	// be stopped. Drain gracefully via the agent before scaling to 0.
+	stopping := !server.Spec.Lifecycle.AutoStartEnabled()
+	if stopping {
+		currentSts := &appsv1.StatefulSet{}
+		if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, currentSts); err != nil && !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		} else if err == nil && currentSts.Spec.Replicas != nil && *currentSts.Spec.Replicas > 0 && stsReady(currentSts) {
+			if err := r.callAgentShutdown(ctx, server); err != nil {
+				logger.Error(err, "agent shutdown failed, proceeding with scale-down")
+			}
+			if r.Recorder != nil {
+				r.Recorder.Event(server, corev1.EventTypeNormal, "AutoStartDisabled",
+					"stopping server: spec.lifecycle.autoStart is false")
+			}
+		}
+	}
+
 	// Step 3: Reconcile StatefulSet, Headless Service, Agent Service, PVC
 	sts := buildStatefulSet(server, podSpec, labelsMap)
+	if stopping {
+		zero := int32(0)
+		sts.Spec.Replicas = &zero
+	}
 	if err := controllerutil.SetControllerReference(server, sts, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -152,6 +180,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// ClusterIP service for agent gRPC (internal control plane communication only)
 	agentSvc := buildAgentService(server, labelsMap)
+	addAgentMetricsPort(agentSvc, profile)
 	if err := controllerutil.SetControllerReference(server, agentSvc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -176,16 +205,33 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	// ServiceMonitor for the agent metrics endpoint, when the profile opts in
+	// and the Prometheus Operator is installed (skipped with an event otherwise).
+	if err := r.reconcileServiceMonitor(ctx, server, profile, labelsMap); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Step 4: Check readiness and update status
 	currentSts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, currentSts); err != nil {
 		return ctrl.Result{}, err
+	}
+	if stopping {
+		// Server is intentionally stopped; report Stopped and skip
+		// health/idle checks until autoStart is set back to true.
+		if err := r.updateStoppedStatus(ctx, server); err != nil {
+			logger.Error(err, "failed to update GameServer status")
+			return ctrl.Result{}, err
+		}
+		recordGameServerMetrics(server)
+		return ctrl.Result{}, nil
 	}
 	ready := stsReady(currentSts)
 	if err := r.updateStatus(ctx, server, profile, ready); err != nil {
 		logger.Error(err, "failed to update GameServer status")
 		return ctrl.Result{}, err
 	}
+	recordGameServerMetrics(server)
 
 	// Step 6: Agent health check and idle timeout
 	if ready {
@@ -199,6 +245,9 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err != nil {
 				logger.Error(err, "failed to check idle timeout")
 			}
+			// checkIdleTimeout refreshes status.players/playerCapacity and may
+			// change state to Idle — re-export the updated status.
+			recordGameServerMetrics(server)
 			if requeueAfter > 0 {
 				return ctrl.Result{RequeueAfter: requeueAfter}, nil
 			}
@@ -273,6 +322,26 @@ func (r *GameServerReconciler) setProfileMissingCondition(ctx context.Context,
 	setCondition(&server.Status.Conditions, condition)
 
 	_ = r.Status().Update(ctx, server)
+}
+
+// updateStoppedStatus reports the GameServer as intentionally stopped
+// (spec.lifecycle.autoStart=false) and clears player-facing endpoints.
+func (r *GameServerReconciler) updateStoppedStatus(ctx context.Context, server *operatorv1.GameServer) error {
+	server.Status.State = stateStopped
+	server.Status.AgentVersion = ""
+	server.Status.Endpoints = nil
+	server.Status.Players = 0
+
+	setCondition(&server.Status.Conditions, metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionFalse,
+		Reason:             "AutoStartDisabled",
+		Message:            "server is stopped: spec.lifecycle.autoStart is false",
+		ObservedGeneration: server.Generation,
+		LastTransitionTime: metav1.Now(),
+	})
+
+	return r.Status().Update(ctx, server)
 }
 
 func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operatorv1.GameServer, profile *operatorv1.GameProfile, ready bool) error {
@@ -375,6 +444,8 @@ func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *ope
 		return err
 	}
 
+	deleteGameServerMetrics(server.Namespace, server.Name)
+
 	return nil
 }
 
@@ -385,7 +456,9 @@ func agentAddress(server *operatorv1.GameServer) string {
 }
 
 // dialAgent establishes a gRPC connection to the agent for the given GameServer.
-func dialAgent(server *operatorv1.GameServer) (*grpc.ClientConn, error) {
+// Declared as a package-level variable so controller tests can stub agent
+// connectivity (e.g. with a bufconn fake agent).
+var dialAgent = func(server *operatorv1.GameServer) (*grpc.ClientConn, error) {
 	addr := agentAddress(server)
 	return grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),

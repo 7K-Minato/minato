@@ -249,6 +249,9 @@ registrar:
   # controlplaneUrl defaults to the in-cluster control plane service.
   controlplaneUrl: ""
   dedicatedTenantId: ""
+  # clusterFingerprint overrides the auto-detected cluster fingerprint (kube-system
+  # namespace UID) sent during registration and heartbeats. Leave empty to auto-detect.
+  clusterFingerprint: ""
   # Secrets holding the cloud registration token and the control plane API key.
   registerTokenSecret:
     name: minato-registrar

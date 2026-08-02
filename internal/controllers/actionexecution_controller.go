@@ -234,6 +234,7 @@ func (r *ActionExecutionReconciler) setState(ctx context.Context, exec *operator
 		state == operatorv1.ActionExecutionTimedOut ||
 		state == operatorv1.ActionExecutionRejected {
 		exec.Status.EndedAt = &now
+		observeActionExecution(exec.Spec.ActionName, string(state))
 	}
 	exec.Status.AgentResponse = result
 	exec.Status.Error = errMsg

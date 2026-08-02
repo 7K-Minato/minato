@@ -98,10 +98,16 @@ const (
 
 // APIKey defines model for APIKey.
 type APIKey struct {
-	CreatedAt *time.Time  `json:"createdAt,omitempty"`
-	CreatedBy *string     `json:"createdBy,omitempty"`
-	Name      *string     `json:"name,omitempty"`
-	Role      *APIKeyRole `json:"role,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedBy *string    `json:"createdBy,omitempty"`
+
+	// ExpiresAt Optional expiry time; expired keys are rejected with 401
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	Name      *string    `json:"name,omitempty"`
+
+	// Namespaces Namespace patterns the key is restricted to (empty = cluster-wide)
+	Namespaces *[]string   `json:"namespaces,omitempty"`
+	Role       *APIKeyRole `json:"role,omitempty"`
 }
 
 // APIKeyRole defines model for APIKey.Role.
@@ -110,12 +116,14 @@ type APIKeyRole string
 // APIKeyCreated defines model for APIKeyCreated.
 type APIKeyCreated struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 
 	// Key The API key value (shown once)
-	Key     string  `json:"key"`
-	Name    string  `json:"name"`
-	Role    string  `json:"role"`
-	Warning *string `json:"warning,omitempty"`
+	Key        string    `json:"key"`
+	Name       string    `json:"name"`
+	Namespaces *[]string `json:"namespaces,omitempty"`
+	Role       string    `json:"role"`
+	Warning    *string   `json:"warning,omitempty"`
 }
 
 // Action defines model for Action.
@@ -191,8 +199,14 @@ type AuthConfigAuthModes string
 
 // CreateAPIKeyRequest defines model for CreateAPIKeyRequest.
 type CreateAPIKeyRequest struct {
+	// ExpiresAt Optional expiry time (must be in the future)
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+
 	// Name Key name
 	Name string `json:"name"`
+
+	// Namespaces Optional namespace patterns (exact names or trailing-"*" globs such as "tenant-*") restricting the key. Omit for a cluster-wide key.
+	Namespaces *[]string `json:"namespaces,omitempty"`
 
 	// Role Role for the key (defaults to the caller's role)
 	Role *CreateAPIKeyRequestRole `json:"role,omitempty"`
@@ -242,8 +256,17 @@ type GameProfileSpec struct {
 		RestoreFromSnapshot *bool `json:"restoreFromSnapshot,omitempty"`
 		Sftp                *bool `json:"sftp,omitempty"`
 	} `json:"capabilities,omitempty"`
+
+	// Category Storefront category (e.g. sandbox, fps, survival, mmo)
+	Category *string `json:"category,omitempty"`
+
+	// Description Markdown blurb describing the game for storefronts
+	Description *string   `json:"description,omitempty"`
 	DisplayName *string   `json:"displayName,omitempty"`
 	Environment *[]EnvVar `json:"environment,omitempty"`
+
+	// Icon URL to an icon image for storefront display
+	Icon *string `json:"icon,omitempty"`
 
 	// Image Game server container image
 	Image         *string `json:"image,omitempty"`
@@ -259,7 +282,9 @@ type GameProfileSpec struct {
 	} `json:"observability,omitempty"`
 	Ports     *[]Port `json:"ports,omitempty"`
 	Resources *struct {
-		Limits *struct {
+		// Default Name of the tier applied when a GameServer does not specify one
+		Default *string `json:"default,omitempty"`
+		Limits  *struct {
 			Cpu    *string `json:"cpu,omitempty"`
 			Memory *string `json:"memory,omitempty"`
 		} `json:"limits,omitempty"`
@@ -267,6 +292,9 @@ type GameProfileSpec struct {
 			Cpu    *string `json:"cpu,omitempty"`
 			Memory *string `json:"memory,omitempty"`
 		} `json:"requests,omitempty"`
+
+		// Tiers Named resource presets selectable via GameServer spec.tier
+		Tiers *map[string]ResourceRequirements `json:"tiers,omitempty"`
 	} `json:"resources,omitempty"`
 	Storage *struct {
 		MountPath   string  `json:"mountPath"`
@@ -315,6 +343,29 @@ type GameServerFleet struct {
 // GameServerFleetSpecUpdateStrategyType defines model for GameServerFleet.Spec.UpdateStrategy.Type.
 type GameServerFleetSpecUpdateStrategyType string
 
+// GameServerFleetPatch Strict merge-patch for fleet scaling. Only spec.replicas is accepted; unknown fields are rejected with 400.
+type GameServerFleetPatch struct {
+	Spec *struct {
+		Replicas *int `json:"replicas,omitempty"`
+	} `json:"spec,omitempty"`
+}
+
+// GameServerLifecycle defines model for GameServerLifecycle.
+type GameServerLifecycle struct {
+	// AutoStart Whether the server should be running. false gracefully stops a running server (agent PrepareShutdown, scale to 0, state Stopped); true starts a stopped server again.
+	AutoStart *bool `json:"autoStart,omitempty"`
+
+	// IdleTimeoutSeconds Seconds of player-idle time before auto-shutdown (0 = never)
+	IdleTimeoutSeconds *int `json:"idleTimeoutSeconds,omitempty"`
+}
+
+// GameServerLifecyclePatch Strict merge-patch for GameServer lifecycle control. Only spec.lifecycle.autoStart / spec.lifecycle.idleTimeoutSeconds are accepted; unknown fields are rejected with 400.
+type GameServerLifecyclePatch struct {
+	Spec *struct {
+		Lifecycle *GameServerLifecycle `json:"lifecycle,omitempty"`
+	} `json:"spec,omitempty"`
+}
+
 // GameServerSpec defines model for GameServerSpec.
 type GameServerSpec struct {
 	// Env Environment variables
@@ -331,6 +382,9 @@ type GameServerSpec struct {
 	// Profile Reference to GameProfile name
 	Profile *string      `json:"profile,omitempty"`
 	Storage *StorageSpec `json:"storage,omitempty"`
+
+	// Tier Resource tier from the GameProfile's spec.resources.tiers
+	Tier *string `json:"tier,omitempty"`
 }
 
 // GameServerStatus defines model for GameServerStatus.
@@ -396,6 +450,18 @@ type Port struct {
 // PortProtocol defines model for Port.Protocol.
 type PortProtocol string
 
+// ResourceRequirements defines model for ResourceRequirements.
+type ResourceRequirements struct {
+	Limits *struct {
+		Cpu    *string `json:"cpu,omitempty"`
+		Memory *string `json:"memory,omitempty"`
+	} `json:"limits,omitempty"`
+	Requests *struct {
+		Cpu    *string `json:"cpu,omitempty"`
+		Memory *string `json:"memory,omitempty"`
+	} `json:"requests,omitempty"`
+}
+
 // StorageSpec defines model for StorageSpec.
 type StorageSpec struct {
 	Size        *string `json:"size,omitempty"`
@@ -430,8 +496,17 @@ type ExecuteActionJSONBody map[string]string
 // CreateAPIKeyJSONRequestBody defines body for CreateAPIKey for application/json ContentType.
 type CreateAPIKeyJSONRequestBody = CreateAPIKeyRequest
 
+// CreateGameServerFleetJSONRequestBody defines body for CreateGameServerFleet for application/json ContentType.
+type CreateGameServerFleetJSONRequestBody = GameServerFleet
+
+// UpdateGameServerFleetJSONRequestBody defines body for UpdateGameServerFleet for application/json ContentType.
+type UpdateGameServerFleetJSONRequestBody = GameServerFleetPatch
+
 // CreateGameServerJSONRequestBody defines body for CreateGameServer for application/json ContentType.
 type CreateGameServerJSONRequestBody = GameServer
+
+// UpdateGameServerLifecycleJSONRequestBody defines body for UpdateGameServerLifecycle for application/json ContentType.
+type UpdateGameServerLifecycleJSONRequestBody = GameServerLifecyclePatch
 
 // ExecuteActionJSONRequestBody defines body for ExecuteAction for application/json ContentType.
 type ExecuteActionJSONRequestBody ExecuteActionJSONBody
@@ -523,8 +598,21 @@ type ClientInterface interface {
 	// ListGameServerFleets request
 	ListGameServerFleets(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateGameServerFleetWithBody request with any body
+	CreateGameServerFleetWithBody(ctx context.Context, namespace string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateGameServerFleet(ctx context.Context, namespace string, body CreateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteGameServerFleet request
+	DeleteGameServerFleet(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetGameServerFleet request
 	GetGameServerFleet(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateGameServerFleetWithBody request with any body
+	UpdateGameServerFleetWithBody(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateGameServerFleet(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListGameServers request
 	ListGameServers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -539,6 +627,11 @@ type ClientInterface interface {
 
 	// GetGameServer request
 	GetGameServer(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateGameServerLifecycleWithBody request with any body
+	UpdateGameServerLifecycleWithBody(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateGameServerLifecycle(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerLifecycleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListActions request
 	ListActions(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -636,8 +729,68 @@ func (c *Client) ListGameServerFleets(ctx context.Context, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
+func (c *Client) CreateGameServerFleetWithBody(ctx context.Context, namespace string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGameServerFleetRequestWithBody(c.Server, namespace, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateGameServerFleet(ctx context.Context, namespace string, body CreateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGameServerFleetRequest(c.Server, namespace, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteGameServerFleet(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteGameServerFleetRequest(c.Server, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetGameServerFleet(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetGameServerFleetRequest(c.Server, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateGameServerFleetWithBody(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGameServerFleetRequestWithBody(c.Server, namespace, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateGameServerFleet(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGameServerFleetRequest(c.Server, namespace, name, body)
 	if err != nil {
 		return nil, err
 	}
@@ -698,6 +851,30 @@ func (c *Client) DeleteGameServer(ctx context.Context, namespace Namespace, name
 
 func (c *Client) GetGameServer(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetGameServerRequest(c.Server, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateGameServerLifecycleWithBody(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGameServerLifecycleRequestWithBody(c.Server, namespace, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateGameServerLifecycle(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerLifecycleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGameServerLifecycleRequest(c.Server, namespace, name, body)
 	if err != nil {
 		return nil, err
 	}
@@ -980,6 +1157,94 @@ func NewListGameServerFleetsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewCreateGameServerFleetRequest calls the generic CreateGameServerFleet builder with application/json body
+func NewCreateGameServerFleetRequest(server string, namespace string, body CreateGameServerFleetJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateGameServerFleetRequestWithBody(server, namespace, "application/json", bodyReader)
+}
+
+// NewCreateGameServerFleetRequestWithBody generates requests for CreateGameServerFleet with any type of body
+func NewCreateGameServerFleetRequestWithBody(server string, namespace string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "namespace", runtime.ParamLocationPath, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/gameserverfleets/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteGameServerFleetRequest generates requests for DeleteGameServerFleet
+func NewDeleteGameServerFleetRequest(server string, namespace Namespace, name Name) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "namespace", runtime.ParamLocationPath, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/gameserverfleets/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetGameServerFleetRequest generates requests for GetGameServerFleet
 func NewGetGameServerFleetRequest(server string, namespace Namespace, name Name) (*http.Request, error) {
 	var err error
@@ -1017,6 +1282,60 @@ func NewGetGameServerFleetRequest(server string, namespace Namespace, name Name)
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateGameServerFleetRequest calls the generic UpdateGameServerFleet builder with application/json body
+func NewUpdateGameServerFleetRequest(server string, namespace Namespace, name Name, body UpdateGameServerFleetJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateGameServerFleetRequestWithBody(server, namespace, name, "application/json", bodyReader)
+}
+
+// NewUpdateGameServerFleetRequestWithBody generates requests for UpdateGameServerFleet with any type of body
+func NewUpdateGameServerFleetRequestWithBody(server string, namespace Namespace, name Name, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "namespace", runtime.ParamLocationPath, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/gameserverfleets/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -1173,6 +1492,60 @@ func NewGetGameServerRequest(server string, namespace Namespace, name Name) (*ht
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateGameServerLifecycleRequest calls the generic UpdateGameServerLifecycle builder with application/json body
+func NewUpdateGameServerLifecycleRequest(server string, namespace Namespace, name Name, body UpdateGameServerLifecycleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateGameServerLifecycleRequestWithBody(server, namespace, name, "application/json", bodyReader)
+}
+
+// NewUpdateGameServerLifecycleRequestWithBody generates requests for UpdateGameServerLifecycle with any type of body
+func NewUpdateGameServerLifecycleRequestWithBody(server string, namespace Namespace, name Name, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "namespace", runtime.ParamLocationPath, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/gameservers/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -1649,8 +2022,21 @@ type ClientWithResponsesInterface interface {
 	// ListGameServerFleetsWithResponse request
 	ListGameServerFleetsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListGameServerFleetsResponse, error)
 
+	// CreateGameServerFleetWithBodyWithResponse request with any body
+	CreateGameServerFleetWithBodyWithResponse(ctx context.Context, namespace string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGameServerFleetResponse, error)
+
+	CreateGameServerFleetWithResponse(ctx context.Context, namespace string, body CreateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGameServerFleetResponse, error)
+
+	// DeleteGameServerFleetWithResponse request
+	DeleteGameServerFleetWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*DeleteGameServerFleetResponse, error)
+
 	// GetGameServerFleetWithResponse request
 	GetGameServerFleetWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*GetGameServerFleetResponse, error)
+
+	// UpdateGameServerFleetWithBodyWithResponse request with any body
+	UpdateGameServerFleetWithBodyWithResponse(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGameServerFleetResponse, error)
+
+	UpdateGameServerFleetWithResponse(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGameServerFleetResponse, error)
 
 	// ListGameServersWithResponse request
 	ListGameServersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListGameServersResponse, error)
@@ -1665,6 +2051,11 @@ type ClientWithResponsesInterface interface {
 
 	// GetGameServerWithResponse request
 	GetGameServerWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*GetGameServerResponse, error)
+
+	// UpdateGameServerLifecycleWithBodyWithResponse request with any body
+	UpdateGameServerLifecycleWithBodyWithResponse(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGameServerLifecycleResponse, error)
+
+	UpdateGameServerLifecycleWithResponse(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerLifecycleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGameServerLifecycleResponse, error)
 
 	// ListActionsWithResponse request
 	ListActionsWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*ListActionsResponse, error)
@@ -1798,6 +2189,55 @@ func (r ListGameServerFleetsResponse) StatusCode() int {
 	return 0
 }
 
+type CreateGameServerFleetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *GameServerFleet
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON403      *Forbidden
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateGameServerFleetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateGameServerFleetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteGameServerFleetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Unauthorized
+	JSON403      *Forbidden
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteGameServerFleetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteGameServerFleetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetGameServerFleetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1815,6 +2255,32 @@ func (r GetGameServerFleetResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetGameServerFleetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateGameServerFleetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GameServerFleet
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON403      *Forbidden
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateGameServerFleetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateGameServerFleetResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1910,6 +2376,32 @@ func (r GetGameServerResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetGameServerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateGameServerLifecycleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GameServer
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON403      *Forbidden
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateGameServerLifecycleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateGameServerLifecycleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2211,6 +2703,32 @@ func (c *ClientWithResponses) ListGameServerFleetsWithResponse(ctx context.Conte
 	return ParseListGameServerFleetsResponse(rsp)
 }
 
+// CreateGameServerFleetWithBodyWithResponse request with arbitrary body returning *CreateGameServerFleetResponse
+func (c *ClientWithResponses) CreateGameServerFleetWithBodyWithResponse(ctx context.Context, namespace string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGameServerFleetResponse, error) {
+	rsp, err := c.CreateGameServerFleetWithBody(ctx, namespace, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGameServerFleetResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateGameServerFleetWithResponse(ctx context.Context, namespace string, body CreateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGameServerFleetResponse, error) {
+	rsp, err := c.CreateGameServerFleet(ctx, namespace, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGameServerFleetResponse(rsp)
+}
+
+// DeleteGameServerFleetWithResponse request returning *DeleteGameServerFleetResponse
+func (c *ClientWithResponses) DeleteGameServerFleetWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*DeleteGameServerFleetResponse, error) {
+	rsp, err := c.DeleteGameServerFleet(ctx, namespace, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteGameServerFleetResponse(rsp)
+}
+
 // GetGameServerFleetWithResponse request returning *GetGameServerFleetResponse
 func (c *ClientWithResponses) GetGameServerFleetWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*GetGameServerFleetResponse, error) {
 	rsp, err := c.GetGameServerFleet(ctx, namespace, name, reqEditors...)
@@ -2218,6 +2736,23 @@ func (c *ClientWithResponses) GetGameServerFleetWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseGetGameServerFleetResponse(rsp)
+}
+
+// UpdateGameServerFleetWithBodyWithResponse request with arbitrary body returning *UpdateGameServerFleetResponse
+func (c *ClientWithResponses) UpdateGameServerFleetWithBodyWithResponse(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGameServerFleetResponse, error) {
+	rsp, err := c.UpdateGameServerFleetWithBody(ctx, namespace, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateGameServerFleetResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateGameServerFleetWithResponse(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerFleetJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGameServerFleetResponse, error) {
+	rsp, err := c.UpdateGameServerFleet(ctx, namespace, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateGameServerFleetResponse(rsp)
 }
 
 // ListGameServersWithResponse request returning *ListGameServersResponse
@@ -2262,6 +2797,23 @@ func (c *ClientWithResponses) GetGameServerWithResponse(ctx context.Context, nam
 		return nil, err
 	}
 	return ParseGetGameServerResponse(rsp)
+}
+
+// UpdateGameServerLifecycleWithBodyWithResponse request with arbitrary body returning *UpdateGameServerLifecycleResponse
+func (c *ClientWithResponses) UpdateGameServerLifecycleWithBodyWithResponse(ctx context.Context, namespace Namespace, name Name, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGameServerLifecycleResponse, error) {
+	rsp, err := c.UpdateGameServerLifecycleWithBody(ctx, namespace, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateGameServerLifecycleResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateGameServerLifecycleWithResponse(ctx context.Context, namespace Namespace, name Name, body UpdateGameServerLifecycleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGameServerLifecycleResponse, error) {
+	rsp, err := c.UpdateGameServerLifecycle(ctx, namespace, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateGameServerLifecycleResponse(rsp)
 }
 
 // ListActionsWithResponse request returning *ListActionsResponse
@@ -2531,6 +3083,93 @@ func ParseListGameServerFleetsResponse(rsp *http.Response) (*ListGameServerFleet
 	return response, nil
 }
 
+// ParseCreateGameServerFleetResponse parses an HTTP response from a CreateGameServerFleetWithResponse call
+func ParseCreateGameServerFleetResponse(rsp *http.Response) (*CreateGameServerFleetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateGameServerFleetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest GameServerFleet
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteGameServerFleetResponse parses an HTTP response from a DeleteGameServerFleetWithResponse call
+func ParseDeleteGameServerFleetResponse(rsp *http.Response) (*DeleteGameServerFleetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteGameServerFleetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetGameServerFleetResponse parses an HTTP response from a GetGameServerFleetWithResponse call
 func ParseGetGameServerFleetResponse(rsp *http.Response) (*GetGameServerFleetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -2551,6 +3190,60 @@ func ParseGetGameServerFleetResponse(rsp *http.Response) (*GetGameServerFleetRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateGameServerFleetResponse parses an HTTP response from a UpdateGameServerFleetWithResponse call
+func ParseUpdateGameServerFleetResponse(rsp *http.Response) (*UpdateGameServerFleetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateGameServerFleetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GameServerFleet
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -2704,6 +3397,60 @@ func ParseGetGameServerResponse(rsp *http.Response) (*GetGameServerResponse, err
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateGameServerLifecycleResponse parses an HTTP response from a UpdateGameServerLifecycleWithResponse call
+func ParseUpdateGameServerLifecycleResponse(rsp *http.Response) (*UpdateGameServerLifecycleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateGameServerLifecycleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GameServer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound

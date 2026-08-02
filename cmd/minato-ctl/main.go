@@ -38,6 +38,7 @@ func main() {
 		profileCmd(),
 		snapshotCmd(),
 		consoleCmd(),
+		cloudCmd(),
 	)
 
 	if err := rootCmd.Execute(); err != nil {

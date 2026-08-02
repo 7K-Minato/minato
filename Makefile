@@ -269,6 +269,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 oapi-generate: $(OAPI_CODEGEN) ## Generate chi server interface from api/openapi.yaml.
 	"$(OAPI_CODEGEN)" -config internal/controlplane/oapi/oapi-codegen.yaml api/openapi.yaml
 	"$(OAPI_CODEGEN)" -config sdk/controlplane/gen/oapi-codegen.yaml api/openapi.yaml
+	"$(OAPI_CODEGEN)" -config internal/cloudapi/oapi-codegen.yaml api/minato-cloud.openapi.yaml
 
 $(OAPI_CODEGEN): $(LOCALBIN)
 	$(call go-install-tool,$(OAPI_CODEGEN),github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen,$(OAPI_CODEGEN_VERSION))

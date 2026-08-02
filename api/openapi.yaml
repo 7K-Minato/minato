@@ -160,6 +160,44 @@ paths:
                 $ref: "#/components/schemas/GameServer"
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateGameServerLifecycle
+      tags: [GameServers]
+      summary: Patch game server lifecycle
+      description: |
+        JSON merge-patch for lifecycle control (operator+ only). Only
+        `spec.lifecycle.autoStart` and `spec.lifecycle.idleTimeoutSeconds`
+        may be changed; any other field is rejected with 400.
+
+        Setting `autoStart: false` on a running server gracefully stops it
+        (agent PrepareShutdown, StatefulSet scaled to 0, status.state
+        becomes `Stopped`). Setting `autoStart: true` on a stopped server
+        starts it again. This is the data-plane stop used by minato-cloud
+        to suspend servers (e.g. for dunning).
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameServerLifecyclePatch"
+      responses:
+        "200":
+          description: Updated game server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       operationId: deleteGameServer
       tags: [GameServers]
@@ -340,6 +378,41 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/gameserverfleets/{namespace}:
+    post:
+      operationId: createGameServerFleet
+      tags: [Fleets]
+      summary: Create fleet
+      description: |
+        Create a new GameServerFleet in the specified namespace (admin only).
+        The target namespace is auto-created (and hardened) if it does not
+        exist. The referenced GameProfile must exist and replicas must be >= 0.
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameServerFleet"
+      responses:
+        "201":
+          description: Fleet created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServerFleet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/v1/gameserverfleets/{namespace}/{name}:
     get:
       operationId: getGameServerFleet
@@ -356,6 +429,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GameServerFleet"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateGameServerFleet
+      tags: [Fleets]
+      summary: Scale fleet
+      description: |
+        JSON merge-patch for fleet scaling (operator+ only). Only
+        `spec.replicas` may be changed; any other field is rejected with 400.
+        replicas must be >= 0.
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameServerFleetPatch"
+      responses:
+        "200":
+          description: Updated fleet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServerFleet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteGameServerFleet
+      tags: [Fleets]
+      summary: Delete fleet
+      description: Delete a GameServerFleet and its GameServers (admin only)
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      responses:
+        "204":
+          description: Fleet deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -558,6 +680,10 @@ components:
         profile:
           type: string
           description: Reference to GameProfile name
+        tier:
+          type: string
+          maxLength: 32
+          description: Resource tier from the GameProfile's spec.resources.tiers
         env:
           type: object
           additionalProperties:
@@ -825,6 +951,18 @@ components:
       properties:
         displayName:
           type: string
+        category:
+          type: string
+          maxLength: 32
+          description: Storefront category (e.g. sandbox, fps, survival, mmo)
+        icon:
+          type: string
+          maxLength: 512
+          description: URL to an icon image for storefront display
+        description:
+          type: string
+          maxLength: 4096
+          description: Markdown blurb describing the game for storefronts
         image:
           type: string
           description: Game server container image
@@ -853,6 +991,15 @@ components:
                   type: string
                 memory:
                   type: string
+            tiers:
+              type: object
+              description: Named resource presets selectable via GameServer spec.tier
+              additionalProperties:
+                $ref: "#/components/schemas/ResourceRequirements"
+            default:
+              type: string
+              maxLength: 32
+              description: Name of the tier applied when a GameServer does not specify one
         storage:
           type: object
           properties:
@@ -901,6 +1048,24 @@ components:
                 interval:
                   type: string
 
+    ResourceRequirements:
+      type: object
+      properties:
+        requests:
+          type: object
+          properties:
+            cpu:
+              type: string
+            memory:
+              type: string
+        limits:
+          type: object
+          properties:
+            cpu:
+              type: string
+            memory:
+              type: string
+
     Port:
       type: object
       properties:
@@ -942,6 +1107,15 @@ components:
           format: date-time
         createdBy:
           type: string
+        namespaces:
+          type: array
+          items:
+            type: string
+          description: Namespace patterns the key is restricted to (empty = cluster-wide)
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional expiry time; expired keys are rejected with 401
 
     CreateAPIKeyRequest:
       type: object
@@ -953,6 +1127,17 @@ components:
           type: string
           enum: [viewer, operator, admin]
           description: Role for the key (defaults to the caller's role)
+        namespaces:
+          type: array
+          items:
+            type: string
+          description: >-
+            Optional namespace patterns (exact names or trailing-"*" globs such
+            as "tenant-*") restricting the key. Omit for a cluster-wide key.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional expiry time (must be in the future)
       required: [name]
 
     APIKeyCreated:
@@ -963,6 +1148,13 @@ components:
         role:
           type: string
         createdAt:
+          type: string
+          format: date-time
+        namespaces:
+          type: array
+          items:
+            type: string
+        expiresAt:
           type: string
           format: date-time
         key:
@@ -978,6 +1170,51 @@ components:
         error:
           type: string
       required: [error]
+
+    GameServerLifecycle:
+      type: object
+      additionalProperties: false
+      properties:
+        autoStart:
+          type: boolean
+          description: >-
+            Whether the server should be running. false gracefully stops a
+            running server (agent PrepareShutdown, scale to 0, state Stopped);
+            true starts a stopped server again.
+        idleTimeoutSeconds:
+          type: integer
+          minimum: 0
+          description: Seconds of player-idle time before auto-shutdown (0 = never)
+
+    GameServerLifecyclePatch:
+      type: object
+      additionalProperties: false
+      description: >-
+        Strict merge-patch for GameServer lifecycle control. Only
+        spec.lifecycle.autoStart / spec.lifecycle.idleTimeoutSeconds are
+        accepted; unknown fields are rejected with 400.
+      properties:
+        spec:
+          type: object
+          additionalProperties: false
+          properties:
+            lifecycle:
+              $ref: "#/components/schemas/GameServerLifecycle"
+
+    GameServerFleetPatch:
+      type: object
+      additionalProperties: false
+      description: >-
+        Strict merge-patch for fleet scaling. Only spec.replicas is accepted;
+        unknown fields are rejected with 400.
+      properties:
+        spec:
+          type: object
+          additionalProperties: false
+          properties:
+            replicas:
+              type: integer
+              minimum: 0
 
   responses:
     BadRequest:

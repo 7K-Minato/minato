@@ -1,131 +1,108 @@
 package auth
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/coreos/go-oidc/v3/oidc"
 )
 
-// OIDCProvider implements generic OIDC authentication.
+// OIDCProvider implements generic OIDC authentication using the provider's
+// remote key set (via discovery) for signature verification.
 type OIDCProvider struct {
-	issuerURL string
-	clientID  string
+	verifier  *oidc.IDTokenVerifier
 	roleClaim string
-	keys      map[string]*jwt.SigningMethodRSA
-	mu        sync.RWMutex
-	lastFetch time.Time
 }
 
-// NewOIDCProvider creates an OIDC auth provider.
+// oidcClaims holds the standard claims we extract from a verified ID token.
+type oidcClaims struct {
+	Sub               string `json:"sub"`
+	Email             string `json:"email"`
+	Name              string `json:"name"`
+	PreferredUsername string `json:"preferred_username"`
+}
+
+// NewOIDCProvider creates an OIDC auth provider. It performs OIDC discovery
+// against the issuer at startup; a failure here is a configuration error and
+// prevents the control plane from starting.
 func NewOIDCProvider(cfg OIDCConfig) (*OIDCProvider, error) {
+	return NewOIDCProviderWithContext(context.Background(), cfg)
+}
+
+// NewOIDCProviderWithContext creates an OIDC auth provider with a caller-supplied
+// context for the initial discovery request.
+func NewOIDCProviderWithContext(ctx context.Context, cfg OIDCConfig) (*OIDCProvider, error) {
 	if cfg.IssuerURL == "" || cfg.ClientID == "" {
 		return nil, errors.New("oidc auth: issuer URL and client ID required")
 	}
 
-	p := &OIDCProvider{
-		issuerURL: strings.TrimSuffix(cfg.IssuerURL, "/"),
-		clientID:  cfg.ClientID,
+	issuer := strings.TrimSuffix(cfg.IssuerURL, "/")
+	provider, err := oidc.NewProvider(ctx, issuer)
+	if err != nil {
+		return nil, fmt.Errorf("oidc auth: discovery failed for issuer %q: %w", issuer, err)
+	}
+
+	return &OIDCProvider{
+		verifier: provider.Verifier(&oidc.Config{
+			ClientID: cfg.ClientID,
+		}),
 		roleClaim: cfg.RoleClaim,
-		keys:      make(map[string]*jwt.SigningMethodRSA),
-	}
-
-	// Fetch JWKS on initialization
-	if err := p.fetchJWKS(); err != nil {
-		return nil, fmt.Errorf("oidc auth: failed to fetch JWKS: %w", err)
-	}
-
-	return p, nil
+	}, nil
 }
 
-// Authenticate validates a Bearer token.
+// Authenticate validates a Bearer token. The verifier checks the signature
+// (via the provider's remote key set, with automatic key rotation), issuer,
+// audience (client ID), and expiry. Any failure yields 401.
 func (p *OIDCProvider) Authenticate(r *http.Request) (*User, error) {
-	token := ExtractBearer(r)
-	if token == "" {
+	raw := ExtractBearer(r)
+	if raw == "" {
 		return nil, ErrUnauthorized
 	}
 
-	// Refresh JWKS if needed (older than 1 hour)
-	p.mu.RLock()
-	lastFetch := p.lastFetch
-	p.mu.RUnlock()
-
-	if time.Since(lastFetch) > time.Hour {
-		// Refresh JWKS in the background; on failure, continue with cached keys.
-		_ = p.fetchJWKS()
-	}
-
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
-		// Ensure RSA signing method
-		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-
-		kid, ok := t.Header["kid"].(string)
-		if !ok {
-			return nil, errors.New("token missing kid header")
-		}
-
-		p.mu.RLock()
-		defer p.mu.RUnlock()
-
-		key, exists := p.keys[kid]
-		if !exists {
-			return nil, fmt.Errorf("key %s not found", kid)
-		}
-		return key, nil
-	}, jwt.WithIssuer(p.issuerURL), jwt.WithAudience(p.clientID))
-
-	if err != nil || !parsed.Valid {
+	idToken, err := p.verifier.Verify(r.Context(), raw)
+	if err != nil {
 		return nil, ErrUnauthorized
 	}
 
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
+	var claims oidcClaims
+	if err := idToken.Claims(&claims); err != nil {
 		return nil, ErrUnauthorized
-
 	}
 
-	// Extract role from claims
+	// Extract role from the configured claim (dynamic name, so re-decode into a map).
 	role := "viewer" // default
 	if p.roleClaim != "" {
-		if rawRoles, ok := claims[p.roleClaim]; ok {
-			switch v := rawRoles.(type) {
-			case string:
-				role = v
-			case []any:
-				if len(v) > 0 {
-					if s, ok := v[0].(string); ok {
-						role = s
+		var all map[string]any
+		if err := idToken.Claims(&all); err == nil {
+			if rawRoles, ok := all[p.roleClaim]; ok {
+				switch v := rawRoles.(type) {
+				case string:
+					role = v
+				case []any:
+					if len(v) > 0 {
+						if s, ok := v[0].(string); ok {
+							role = s
+						}
 					}
 				}
 			}
 		}
 	}
 
-	// Extract user info
-	username := ""
-	if sub, ok := claims["sub"].(string); ok {
-		username = sub
-	}
-	if preferred, ok := claims["preferred_username"].(string); ok {
-		username = preferred
-	}
-
-	email := ""
-	if e, ok := claims["email"].(string); ok {
-		email = e
+	username := claims.Sub
+	if claims.PreferredUsername != "" {
+		username = claims.PreferredUsername
+	} else if claims.Name != "" {
+		username = claims.Name
 	}
 
 	return &User{
-		ID:       username,
+		ID:       claims.Sub,
 		Username: username,
-		Email:    email,
+		Email:    claims.Email,
 		Role:     role,
 		Source:   "oidc",
 	}, nil
@@ -134,56 +111,4 @@ func (p *OIDCProvider) Authenticate(r *http.Request) (*User, error) {
 // Name returns the provider identifier.
 func (p *OIDCProvider) Name() string {
 	return "oidc"
-}
-
-// fetchJWKS fetches the JSON Web Key Set from the OIDC discovery endpoint.
-func (p *OIDCProvider) fetchJWKS() error {
-	// This is a simplified implementation
-	// In production, you'd fetch from .well-known/openid-configuration
-	// then parse the jwks_uri response
-
-	discoveryURL := p.issuerURL + "/.well-known/openid-configuration"
-	resp, err := http.Get(discoveryURL)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var config struct {
-		JWKSURI string `json:"jwks_uri"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return err
-	}
-
-	if config.JWKSURI == "" {
-		return errors.New("jwks_uri not found in discovery document")
-	}
-
-	// Fetch JWKS
-	jwksResp, err := http.Get(config.JWKSURI)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = jwksResp.Body.Close() }()
-
-	var jwks struct {
-		Keys []struct {
-			KID string `json:"kid"`
-			N   string `json:"n"`
-			E   string `json:"e"`
-		} `json:"keys"`
-	}
-	if err := json.NewDecoder(jwksResp.Body).Decode(&jwks); err != nil {
-		return err
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.lastFetch = time.Now()
-	// Parse keys and store them
-	// This is simplified - full implementation would parse RSA keys from base64
-
-	return nil
 }

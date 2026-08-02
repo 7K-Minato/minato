@@ -13,6 +13,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -37,6 +38,9 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
+	// Registering the Prometheus Operator types is harmless when the CRDs are
+	// absent; the gameserver controller feature-detects them at runtime.
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 }
 
 // nolint:gocyclo
@@ -185,6 +189,7 @@ func main() {
 		OperatorNamespace: os.Getenv("POD_NAMESPACE"),
 		ImagePullSecrets:  pullSecrets,
 		ExternalDNSZone:   os.Getenv("EXTERNAL_DNS_ZONE"),
+		Recorder:          mgr.GetEventRecorderFor("gameserver-controller"),
 	}
 	if err := gsr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServer")
@@ -202,7 +207,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	gfr := &controllers.GameServerFleetReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	gfr := &controllers.GameServerFleetReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("gameserverfleet-controller"),
+	}
 	if err := gfr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServerFleet")
 		os.Exit(1)

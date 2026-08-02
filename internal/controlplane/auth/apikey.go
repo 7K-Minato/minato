@@ -31,10 +31,11 @@ func (p *APIKeyProvider) Authenticate(r *http.Request) (*User, error) {
 	}
 
 	return &User{
-		ID:       entry.UserID,
-		Username: entry.Username,
-		Role:     entry.Role,
-		Source:   "apikey",
+		ID:         entry.UserID,
+		Username:   entry.Username,
+		Role:       entry.Role,
+		Source:     "apikey",
+		Namespaces: entry.Namespaces,
 	}, nil
 }
 

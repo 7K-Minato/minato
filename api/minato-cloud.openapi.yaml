@@ -1,0 +1,1672 @@
+# SNAPSHOT of the minato-cloud SaaS API spec (sibling repo).
+# Provenance: minato-cloud/api/openapi.yaml @ copied for minato-ctl cloud client codegen.
+# Do NOT edit here; update the source spec in the minato-cloud repo, then re-copy
+# and regenerate: make oapi-generate (see internal/cloudapi/oapi-codegen.yaml).
+openapi: 3.0.3
+info:
+  title: Minato Cloud API
+  description: |
+    Customer-facing API of minato cloud: tenants, subscriptions, and game
+    server lifecycle proxied to per-cluster minato control planes.
+
+    This document is the **source of truth** for the API contract. The web
+    dashboard's TypeScript client is generated from it; edit the spec first,
+    then regenerate (`npm run gen:api` in `web/`).
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+  - name: Plans
+  - name: Tenants
+  - name: Members
+  - name: Invites
+  - name: Billing
+  - name: Servers
+  - name: Profiles
+  - name: Catalog
+  - name: Regions
+  - name: Audit
+  - name: API Keys
+  - name: Admin
+  - name: Registry
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      tags: [Health]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: API is alive
+
+  /readyz:
+    get:
+      operationId: getReadyz
+      tags: [Health]
+      summary: Readiness probe
+      security: []
+      responses:
+        "200":
+          description: API is ready
+
+  /api/v1/billing/webhook:
+    post:
+      operationId: stripeWebhook
+      tags: [Billing]
+      summary: Stripe webhook receiver
+      description: Public endpoint called by Stripe; signed with the webhook secret.
+      security: []
+      responses:
+        "200":
+          description: Event processed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/plans:
+    get:
+      operationId: listPlans
+      tags: [Plans]
+      summary: List plan tiers
+      responses:
+        "200":
+          description: Available plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plan"
+
+  /api/v1/me/tenants:
+    get:
+      operationId: listMyTenants
+      tags: [Tenants]
+      summary: List tenants of the current user
+      responses:
+        "200":
+          description: Tenants the caller is a member of
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tenant"
+
+  /api/v1/tenants:
+    post:
+      operationId: createTenant
+      tags: [Tenants]
+      summary: Create a tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantRequest"
+      responses:
+        "201":
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/tenants/{tenantID}:
+    get:
+      operationId: getTenant
+      tags: [Tenants]
+      summary: Get tenant details
+      description: The response includes `role`, the caller's role in this tenant.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Tenant details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateTenant
+      tags: [Tenants]
+      summary: Rename a tenant (owner only)
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTenantRequest"
+      responses:
+        "200":
+          description: Tenant updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteTenant
+      tags: [Tenants]
+      summary: Delete a tenant (owner only)
+      description: |
+        Refused with 409 while the tenant still owns servers, unless
+        `?force=true` is passed — in that case every server is deleted on its
+        cluster's control plane first. Memberships, invites, subscription and
+        server rows cascade with the tenant.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - name: force
+          in: query
+          schema:
+            type: boolean
+          description: Delete all servers before removing the tenant
+      responses:
+        "204":
+          description: Tenant deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Tenant still has servers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/invites/accept:
+    post:
+      operationId: acceptInvite
+      tags: [Invites]
+      summary: Accept a tenant invite
+      description: |
+        Authenticated but not tenant-scoped. On success the caller becomes a
+        member of the invite's tenant with the invited role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInviteRequest"
+      responses:
+        "200":
+          description: Membership created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Invite already accepted or caller is already a member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Invite expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tenants/{tenantID}/invites:
+    get:
+      operationId: listInvites
+      tags: [Invites]
+      summary: List pending invites (owner/admin only)
+      description: Only invites that are neither accepted nor expired.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Pending invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createInvite
+      tags: [Invites]
+      summary: Invite a user by email (owner/admin only)
+      description: |
+        Sends an invitation email with an accept link
+        (`WEB_BASE_URL/invite/<token>`). The token is never returned (except
+        as `devToken` in DEV_MODE) and only its SHA-256 hash is stored.
+        Only owners may invite admins.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteRequest"
+      responses:
+        "201":
+          description: Invite created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/tenants/{tenantID}/invites/{inviteID}:
+    delete:
+      operationId: revokeInvite
+      tags: [Invites]
+      summary: Revoke an invite (owner/admin only)
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - name: inviteID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Invite revoked
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tenants/{tenantID}/members:
+    get:
+      operationId: listMembers
+      tags: [Members]
+      summary: List tenant members
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Membership"
+    post:
+      operationId: addMember
+      tags: [Members]
+      summary: Add a member directly (owner only)
+      description: Escape hatch for adding a member by user sub; prefer invites.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberRequest"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/tenants/{tenantID}/members/{userSub}:
+    delete:
+      operationId: removeMember
+      tags: [Members]
+      summary: Remove a member (owner/admin only)
+      description: Admins may remove members only; removing an admin or owner requires the owner role.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - name: userSub
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Member removed
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tenants/{tenantID}/subscription:
+    get:
+      operationId: getSubscription
+      tags: [Billing]
+      summary: Get the tenant's subscription
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tenants/{tenantID}/billing/checkout:
+    post:
+      operationId: createCheckout
+      tags: [Billing]
+      summary: Create a Stripe checkout session for a plan (owner only)
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutRequest"
+      responses:
+        "200":
+          description: Checkout session URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedirectURL"
+
+  /api/v1/tenants/{tenantID}/billing/portal:
+    post:
+      operationId: createPortal
+      tags: [Billing]
+      summary: Create a Stripe customer portal session (owner only)
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Portal session URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedirectURL"
+
+  /api/v1/tenants/{tenantID}/billing/invoices:
+    get:
+      operationId: listInvoices
+      tags: [Billing]
+      summary: List the tenant's billing invoices
+      description: |
+        Local snapshots of Stripe invoices, recorded on `invoice.finalized`
+        and `invoice.paid` webhook events. Newest first, max 50.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+
+  /api/v1/tenants/{tenantID}/servers:
+    get:
+      operationId: listServers
+      tags: [Servers]
+      summary: List the tenant's servers
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Server"
+    post:
+      operationId: createServer
+      tags: [Servers]
+      summary: Create a game server (owner/admin only)
+      description: |
+        Requires an active subscription and free plan quota (except in DEV_MODE,
+        where the `pro` plan is assumed when no subscription exists).
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServerRequest"
+      responses:
+        "201":
+          description: Server created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          description: Active subscription required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          description: No cluster capacity available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tenants/{tenantID}/servers/{serverID}:
+    get:
+      operationId: getServer
+      tags: [Servers]
+      summary: Get server details, refreshed from the control plane when reachable
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "200":
+          description: Server details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerWithLive"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteServer
+      tags: [Servers]
+      summary: Delete a server (owner/admin only)
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "204":
+          description: Server deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tenants/{tenantID}/servers/{serverID}/actions:
+    get:
+      operationId: listActions
+      tags: [Servers]
+      summary: List actions available on a server (from its game profile)
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "200":
+          description: Available actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Action"
+
+  /api/v1/tenants/{tenantID}/servers/{serverID}/actions/{action}:
+    post:
+      operationId: executeAction
+      tags: [Servers]
+      summary: Execute an action on a server
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        "202":
+          description: Action execution started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionExecutionRef"
+
+  /api/v1/tenants/{tenantID}/servers/{serverID}/executions/{executionID}:
+    get:
+      operationId: getActionExecution
+      tags: [Servers]
+      summary: Get the status of a dispatched action execution
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+        - name: executionID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Action execution status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionExecution"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/tenants/{tenantID}/servers/{serverID}/snapshots:
+    get:
+      operationId: listSnapshots
+      tags: [Servers]
+      summary: List snapshots of a server
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "200":
+          description: Snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameSnapshot"
+    post:
+      operationId: createSnapshot
+      tags: [Servers]
+      summary: Create a snapshot of a server
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "201":
+          description: Snapshot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSnapshot"
+
+  /api/v1/tenants/{tenantID}/servers/{serverID}/console:
+    get:
+      operationId: getConsole
+      tags: [Servers]
+      summary: Console WebSocket stream
+      description: |
+        Upgrades to a WebSocket connection proxied to the owning cluster's
+        control plane. Message protocol (typed JSON frames) is defined by
+        minato's `api/console.schema.json`. Browsers authenticate via the
+        `access_token` query parameter (see `/api/ws-token` in the web BFF).
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "101":
+          description: Switching Protocols — WebSocket stream established
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/regions:
+    get:
+      operationId: listRegions
+      tags: [Regions]
+      summary: List regions with at least one non-stale cluster
+      description: |
+        Distinct regions of clusters whose heartbeat is fresh (or that never
+        heartbeated). Authenticated but not tenant-scoped.
+      responses:
+        "200":
+          description: Region names, sorted
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /api/v1/tenants/{tenantID}/profiles:
+    get:
+      operationId: listProfiles
+      tags: [Profiles]
+      summary: List available game profiles
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Game profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameProfile"
+
+  /api/v1/tenants/{tenantID}/profiles/{name}:
+    get:
+      operationId: getProfile
+      tags: [Profiles]
+      summary: Game profile detail
+      description: |
+        Full storefront detail of one profile, fetched from a non-stale
+        cluster that has it installed (cached in memory for 5 minutes).
+        404 when no non-stale cluster has the profile.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Profile detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogEntry"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          description: All clusters having the profile failed to answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tenants/{tenantID}/catalog:
+    get:
+      operationId: getCatalog
+      tags: [Catalog]
+      summary: Storefront catalog of all available game profiles
+      description: |
+        Union of the profiles installed across the fleet, with display
+        metadata, resource tiers and the regions each profile is available
+        in. Profiles whose detail cannot be fetched (broken/stale clusters)
+        are skipped.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Catalog entries, sorted by profile name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CatalogEntry"
+
+  /api/v1/tenants/{tenantID}/audit:
+    get:
+      operationId: listAudit
+      tags: [Audit]
+      summary: List tenant audit events
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Audit events, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEvent"
+
+  /api/v1/tenants/{tenantID}/apikeys:
+    get:
+      operationId: listAPIKeys
+      tags: [API Keys]
+      summary: List tenant API keys (owner/admin only, session-only)
+      description: |
+        Session-only route: tenant API keys (including wildcard `*` keys)
+        cannot manage API keys. Returns metadata only — the key hash and the
+        plaintext key are never exposed.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: API keys, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/APIKey"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createAPIKey
+      tags: [API Keys]
+      summary: Create a tenant API key (owner/admin only, session-only)
+      description: |
+        The full key (`mk_<prefix>_<secret>`) is returned exactly once in
+        `key`; only its SHA-256 hash is stored. `scopes` limits what the key
+        may do (`servers:read`, `servers:write`, `console`, `snapshots`);
+        an empty list or `["*"]` grants all scopes (explicit lists are
+        recommended). Billing/team/tenant/apikey routes remain unreachable
+        for API keys regardless of scopes.
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKeyRequest"
+      responses:
+        "201":
+          description: API key created; plaintext key included once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyCreated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/tenants/{tenantID}/apikeys/{keyID}:
+    delete:
+      operationId: deleteAPIKey
+      tags: [API Keys]
+      summary: Revoke a tenant API key (owner/admin only, session-only)
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - name: keyID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: API key revoked
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/admin/clusters:
+    get:
+      operationId: adminListClusters
+      tags: [Admin]
+      summary: List registered clusters (admin token)
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: Clusters (API keys never returned)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Cluster"
+    post:
+      operationId: adminCreateCluster
+      tags: [Admin]
+      summary: Register a cluster (admin token)
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClusterRequest"
+      responses:
+        "201":
+          description: Cluster registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cluster"
+
+  /api/v1/admin/clusters/{clusterID}:
+    delete:
+      operationId: adminDeleteCluster
+      tags: [Admin]
+      summary: Deregister a cluster (admin token)
+      security:
+        - adminToken: []
+      parameters:
+        - name: clusterID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Cluster deregistered
+
+  /api/v1/admin/plans/{planID}:
+    put:
+      operationId: adminUpdatePlanPrices
+      tags: [Admin]
+      summary: Set Stripe price IDs on a plan (admin token)
+      description: |
+        Lets an operator set Stripe price IDs on a plan without redeploying
+        (seed values would otherwise overwrite them on next boot).
+      security:
+        - adminToken: []
+      parameters:
+        - name: planID
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlanPricesRequest"
+      responses:
+        "200":
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/clusters/register:
+    post:
+      operationId: registerCluster
+      tags: [Registry]
+      summary: Self-register a cluster (register token)
+      description: |
+        Called by the in-cluster registrar sidecar on startup (and after
+        losing state). Idempotent by `clusterFingerprint` (when provided) or
+        by name.
+      security:
+        - registerToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClusterRequest"
+      responses:
+        "200":
+          description: Cluster registered (or updated)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cluster"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/clusters/{name}/heartbeat:
+    post:
+      operationId: clusterHeartbeat
+      tags: [Registry]
+      summary: Mark a cluster alive (register token)
+      description: |
+        404 tells the registrar to re-register (cloud lost state or the
+        cluster was deregistered). When the payload carries a
+        `clusterFingerprint` and no cluster matches the name, the fingerprint
+        is used instead (the cluster may have been renamed).
+      security:
+        - registerToken: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HeartbeatRequest"
+      responses:
+        "204":
+          description: Heartbeat recorded
+        "404":
+          description: Unknown cluster; re-register
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  parameters:
+    TenantID:
+      name: tenantID
+      in: path
+      required: true
+      schema:
+        type: string
+    ServerID:
+      name: serverID
+      in: path
+      required: true
+      schema:
+        type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Keycloak-issued OIDC ID token (stubbed in DEV_MODE), or a tenant API
+        key (`mk_<prefix>_<secret>`, see the API Keys tag). API keys are
+        tenant-scoped and scope-limited; billing/team/tenant/apikey routes
+        are session-only and reject API keys with 403.
+    adminToken:
+      type: http
+      scheme: bearer
+      description: Static admin token (`ADMIN_TOKEN`) for the cluster registry API
+    registerToken:
+      type: http
+      scheme: bearer
+      description: |
+        Scoped register token (`REGISTER_TOKEN`) for the cluster
+        self-registration and heartbeat API (registrar sidecars only)
+
+  schemas:
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+          description: The caller's role in this tenant (present on getTenant responses)
+        created_at:
+          type: string
+          format: date-time
+      required: [id, name, slug]
+
+    CreateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+      required: [name, slug]
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required: [name]
+
+    APIKey:
+      type: object
+      description: Tenant API key metadata. The key hash is never returned.
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        name:
+          type: string
+        prefix:
+          type: string
+          description: Lookup prefix of the key (the `mk_<prefix>_…` part)
+        scopes:
+          type: array
+          items:
+            type: string
+            enum: ["servers:read", "servers:write", "console", "snapshots", "*"]
+          description: Empty list or ["*"] grants all scopes
+        expires_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [id, tenant_id, name, prefix, scopes, created_by, created_at]
+
+    CreateAPIKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        scopes:
+          type: array
+          items:
+            type: string
+            enum: ["servers:read", "servers:write", "console", "snapshots", "*"]
+          description: Empty/omitted or ["*"] grants all scopes
+        expiresInDays:
+          type: integer
+          minimum: 1
+          description: Optional days until the key expires
+      required: [name]
+
+    APIKeyCreated:
+      allOf:
+        - $ref: "#/components/schemas/APIKey"
+        - type: object
+          description: Returned once at creation; the only place the full key appears.
+          properties:
+            key:
+              type: string
+              description: Full plaintext key (mk_<prefix>_<secret>) — store it now
+          required: [key]
+
+    Invite:
+      type: object
+      description: The opaque accept token is never returned (only as `devToken` in DEV_MODE).
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+        invited_by:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        accepted_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        devToken:
+          type: string
+          description: Accept token, only present when the API runs in DEV_MODE
+      required: [id, tenant_id, email, role, invited_by, expires_at]
+
+    CreateInviteRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+      required: [email, role]
+
+    AcceptInviteRequest:
+      type: object
+      properties:
+        token:
+          type: string
+      required: [token]
+
+    Membership:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        user_sub:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+        created_at:
+          type: string
+          format: date-time
+      required: [tenant_id, user_sub, role]
+
+    AddMemberRequest:
+      type: object
+      properties:
+        userSub:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+      required: [userSub, role]
+
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        max_servers:
+          type: integer
+        max_storage_gb:
+          type: integer
+        isolation:
+          type: string
+          enum: [shared, dedicated]
+        stripe_price_id:
+          type: string
+        monthly_price_cents:
+          type: integer
+      required: [id, display_name, max_servers, max_storage_gb, isolation]
+
+    Subscription:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        stripe_customer_id:
+          type: string
+        stripe_subscription_id:
+          type: string
+        plan_id:
+          type: string
+        status:
+          type: string
+        current_period_end:
+          type: string
+          format: date-time
+        grace_until:
+          type: string
+          format: date-time
+          description: Set when past_due; quota access ends and servers are suspended after this time
+      required: [tenant_id, plan_id, status]
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Stripe invoice id
+        tenant_id:
+          type: string
+        number:
+          type: string
+        amount_due_cents:
+          type: integer
+        currency:
+          type: string
+        status:
+          type: string
+        pdf_url:
+          type: string
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required: [id, tenant_id]
+
+    CheckoutRequest:
+      type: object
+      properties:
+        planId:
+          type: string
+      required: [planId]
+
+    RedirectURL:
+      type: object
+      properties:
+        url:
+          type: string
+      required: [url]
+
+    Server:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        cluster_id:
+          type: string
+        namespace:
+          type: string
+        name:
+          type: string
+        profile:
+          type: string
+        tier:
+          type: string
+        storage_size:
+          type: string
+        status:
+          type: string
+        suspended:
+          type: boolean
+          description: True while the tenant's payment is past due beyond grace; mutating operations return 403
+        created_at:
+          type: string
+          format: date-time
+      required: [id, tenant_id, cluster_id, namespace, name, profile, status]
+
+    ServerWithLive:
+      type: object
+      properties:
+        server:
+          $ref: "#/components/schemas/Server"
+        live:
+          $ref: "#/components/schemas/LiveGameServer"
+      required: [server]
+
+    LiveGameServer:
+      type: object
+      description: Live GameServer state as returned by the owning control plane
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+        spec:
+          type: object
+        status:
+          type: object
+          properties:
+            state:
+              type: string
+            players:
+              type: integer
+            playerCapacity:
+              type: integer
+            endpoints:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  address:
+                    type: string
+                  port:
+                    type: integer
+
+    CreateServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$"
+        profile:
+          type: string
+        tier:
+          type: string
+        region:
+          type: string
+        storageSize:
+          type: string
+        snapshot:
+          type: string
+          description: Name of an existing snapshot to restore the new server from
+        loadBalancerIp:
+          type: string
+          description: Pin a specific external IP for the server (must be free in the load balancer pool)
+        env:
+          type: object
+          additionalProperties:
+            type: string
+      required: [name, profile]
+
+    ActionExecutionRef:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Execution ID
+      required: [name]
+
+    ActionExecution:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+        spec:
+          type: object
+          properties:
+            actionName:
+              type: string
+            caller:
+              type: string
+            params:
+              type: object
+              additionalProperties:
+                type: string
+        status:
+          type: object
+          properties:
+            state:
+              type: string
+              enum: [Pending, Running, Succeeded, Failed, Rejected]
+            result:
+              type: string
+            error:
+              type: string
+            startedAt:
+              type: string
+              format: date-time
+            completedAt:
+              type: string
+              format: date-time
+
+    GameSnapshot:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+        spec:
+          type: object
+          properties:
+            gameServerRef:
+              type: string
+            schedule:
+              type: string
+        status:
+          type: object
+          properties:
+            state:
+              type: string
+            readyAt:
+              type: string
+              format: date-time
+            size:
+              type: string
+
+    ActionParam:
+      type: object
+      properties:
+        type:
+          type: string
+        required:
+          type: boolean
+        default:
+          type: string
+
+    Action:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        concurrency:
+          type: string
+        timeout:
+          type: string
+        params:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ActionParam"
+
+    GameProfile:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+        spec:
+          type: object
+          properties:
+            displayName:
+              type: string
+            image:
+              type: string
+            actions:
+              type: array
+              items:
+                $ref: "#/components/schemas/Action"
+
+    ProfileTier:
+      type: object
+      properties:
+        name:
+          type: string
+        requests:
+          type: object
+          additionalProperties:
+            type: string
+          description: 'Resource requests, e.g. {"cpu": "500m", "memory": "1Gi"}'
+        limits:
+          type: object
+          additionalProperties:
+            type: string
+      required: [name]
+
+    ProfileEnvironment:
+      type: object
+      properties:
+        key:
+          type: string
+        default:
+          type: string
+        required:
+          type: boolean
+        description:
+          type: string
+      required: [key]
+
+    CatalogEntry:
+      type: object
+      description: Storefront view of a game profile (also the profile detail response)
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        category:
+          type: string
+        icon:
+          type: string
+        description:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Enabled optional capabilities (files, sftp, backup, restoreFromSnapshot)
+        tiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileTier"
+        defaultTier:
+          type: string
+        storageDefault:
+          type: string
+        storageMin:
+          type: string
+          description: Minimum PVC size the create form should allow (e.g. "10Gi")
+        storageMax:
+          type: string
+          description: Maximum PVC size the create form should allow (e.g. "200Gi")
+        environment:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileEnvironment"
+        regions:
+          type: array
+          items:
+            type: string
+          description: Regions of the non-stale clusters that have this profile installed
+      required: [name, displayName, capabilities, tiers, regions]
+
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenant_id:
+          type: string
+        user_sub:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        payload:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [id, tenant_id, action]
+
+    Cluster:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        region:
+          type: string
+        controlplaneUrl:
+          type: string
+        capacityMax:
+          type: integer
+        dedicatedTenantId:
+          type: string
+        lastHeartbeat:
+          type: string
+          format: date-time
+          description: Last registrar heartbeat; absent when the cluster never heartbeated
+        healthy:
+          type: boolean
+          description: True while the last heartbeat is fresh
+      required: [id, name, controlplaneUrl]
+
+    CreateClusterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        region:
+          type: string
+        controlplaneUrl:
+          type: string
+        apiKey:
+          type: string
+        capacityMax:
+          type: integer
+        dedicatedTenantId:
+          type: string
+        clusterFingerprint:
+          type: string
+          description: |
+            Stable identity of the physical cluster, sent by the registrar.
+            When set, registration dedups on it instead of name.
+      required: [name, controlplaneUrl, apiKey]
+
+    HeartbeatRequest:
+      type: object
+      properties:
+        capacityMax:
+          type: integer
+        clusterFingerprint:
+          type: string
+          description: |
+            Used to resolve the cluster when no cluster matches the path
+            name (the cluster may have been renamed)
+
+    UpdatePlanPricesRequest:
+      type: object
+      properties:
+        stripePriceId:
+          type: string
+        stripeMeteredPriceId:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

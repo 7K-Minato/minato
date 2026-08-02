@@ -54,6 +54,10 @@ spec:
               value: {{ .Values.registrar.controlplaneUrl | default (printf "http://%s-controlplane:%v" (include "minato.fullname" .) .Values.controlPlane.service.port) | quote }}
             - name: DEDICATED_TENANT_ID
               value: {{ .Values.registrar.dedicatedTenantId | quote }}
+            {{- if .Values.registrar.clusterFingerprint }}
+            - name: CLUSTER_FINGERPRINT
+              value: {{ .Values.registrar.clusterFingerprint | quote }}
+            {{- end }}
             - name: REGISTER_TOKEN
               valueFrom:
                 secretKeyRef:

@@ -65,6 +65,17 @@ func TestRouteGuard(t *testing.T) {
 		{"admin lists apikeys", http.MethodGet, "/api/v1/apikeys", "admin", http.StatusOK},
 		{"admin deletes apikey", http.MethodDelete, "/api/v1/apikeys/abc", "admin", http.StatusOK},
 		{"unauthenticated rejected on guarded route", http.MethodGet, "/api/v1/apikeys", "", http.StatusUnauthorized},
+		{"operator patches gameserver lifecycle", http.MethodPatch, "/api/v1/gameservers/default/gs1", "operator", http.StatusOK},
+		{"admin patches gameserver lifecycle", http.MethodPatch, "/api/v1/gameservers/default/gs1", "admin", http.StatusOK},
+		{"viewer cannot patch gameserver", http.MethodPatch, "/api/v1/gameservers/default/gs1", "viewer", http.StatusForbidden},
+		{"admin creates fleet", http.MethodPost, "/api/v1/gameserverfleets/default", "admin", http.StatusOK},
+		{"operator cannot create fleet", http.MethodPost, "/api/v1/gameserverfleets/default", "operator", http.StatusForbidden},
+		{"viewer cannot create fleet", http.MethodPost, "/api/v1/gameserverfleets/default", "viewer", http.StatusForbidden},
+		{"operator scales fleet", http.MethodPatch, "/api/v1/gameserverfleets/default/f1", "operator", http.StatusOK},
+		{"viewer cannot scale fleet", http.MethodPatch, "/api/v1/gameserverfleets/default/f1", "viewer", http.StatusForbidden},
+		{"admin deletes fleet", http.MethodDelete, "/api/v1/gameserverfleets/default/f1", "admin", http.StatusOK},
+		{"operator cannot delete fleet", http.MethodDelete, "/api/v1/gameserverfleets/default/f1", "operator", http.StatusForbidden},
+		{"viewer reads fleet", http.MethodGet, "/api/v1/gameserverfleets/default/f1", "viewer", http.StatusOK},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

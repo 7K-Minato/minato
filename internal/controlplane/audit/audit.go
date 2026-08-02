@@ -5,8 +5,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/7k-minato/minato/internal/controlplane/auth"
@@ -78,12 +80,34 @@ func Middleware() func(http.Handler) http.Handler {
 	}
 }
 
+// LogAction emits an explicit audit event for a named control-plane action
+// (e.g. "apikey.created"). It never receives or logs secret material; the
+// resource argument should be an identifier such as the key name.
+func LogAction(action, resource string, user *auth.User) {
+	username := "anonymous"
+	role := ""
+	if user != nil {
+		username = user.Username
+		role = user.Role
+	}
+	logAudit(Event{
+		Timestamp: time.Now(),
+		Level:     "audit",
+		User:      username,
+		Role:      role,
+		Action:    action,
+		Resource:  resource,
+		Result:    "success",
+	})
+}
+
+// output is where audit events are written. Overridable for tests.
+var output io.Writer = os.Stdout
+
 // logAudit outputs an audit event as JSON.
 func logAudit(event Event) {
 	data, _ := json.Marshal(event)
-	// Use standard logger or custom output
-	// For now, just print to stdout
-	println(string(data))
+	_, _ = fmt.Fprintln(output, string(data))
 }
 
 // responseWriter wraps http.ResponseWriter to capture status code.

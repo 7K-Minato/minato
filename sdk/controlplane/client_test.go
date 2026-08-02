@@ -156,3 +156,110 @@ func TestListProfilesIncludesParams(t *testing.T) {
 		t.Fatalf("action params lost: %+v", a)
 	}
 }
+
+func TestUpdateGameServerLifecycle(t *testing.T) {
+	var gotBody map[string]any
+	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPatch && r.URL.Path == "/api/v1/gameservers/ns/gs" {
+			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+				t.Errorf("decode patch body: %v", err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"metadata": map[string]any{"name": "gs", "namespace": "ns"},
+				"spec": map[string]any{
+					"profile":   "minecraft",
+					"lifecycle": map[string]any{"autoStart": false, "idleTimeoutSeconds": 120},
+				},
+				"status": map[string]any{"state": "Stopped"},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	autoStart := false
+	idle := int32(120)
+	gs, err := c.UpdateGameServerLifecycle(t.Context(), "ns", "gs", &autoStart, &idle)
+	if err != nil {
+		t.Fatalf("patch lifecycle: %v", err)
+	}
+	lc, _ := gotBody["spec"].(map[string]any)["lifecycle"].(map[string]any)
+	if lc["autoStart"] != false || lc["idleTimeoutSeconds"] != float64(120) {
+		t.Fatalf("unexpected patch body: %v", gotBody)
+	}
+	if gs.Status.State != "Stopped" || gs.Spec.Lifecycle.AutoStart != false || gs.Spec.Lifecycle.IdleTimeoutSeconds != 120 {
+		t.Fatalf("unexpected response: %+v", gs)
+	}
+
+	// nil fields must be omitted from the request body
+	gotBody = nil
+	if _, err := c.UpdateGameServerLifecycle(t.Context(), "ns", "gs", nil, nil); err != nil {
+		t.Fatalf("patch lifecycle nil: %v", err)
+	}
+	lc, _ = gotBody["spec"].(map[string]any)["lifecycle"].(map[string]any)
+	if _, ok := lc["autoStart"]; ok {
+		t.Fatalf("autoStart must be omitted when nil: %v", gotBody)
+	}
+	if _, ok := lc["idleTimeoutSeconds"]; ok {
+		t.Fatalf("idleTimeoutSeconds must be omitted when nil: %v", gotBody)
+	}
+}
+
+func TestFleetWriteEndpoints(t *testing.T) {
+	var gotBody map[string]any
+	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/gameserverfleets/ns":
+			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+				t.Errorf("decode create body: %v", err)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(gotBody)
+		case r.Method == http.MethodPatch && r.URL.Path == "/api/v1/gameserverfleets/ns/f1":
+			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+				t.Errorf("decode patch body: %v", err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"metadata": map[string]any{"name": "f1", "namespace": "ns"},
+				"spec":     map[string]any{"profile": "minecraft", "replicas": 5},
+			})
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/gameserverfleets/ns/f1":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	fleet := &GameServerFleet{Metadata: ObjectMeta{Name: "f1"}}
+	fleet.Spec.Profile = "minecraft"
+	fleet.Spec.Replicas = 2
+	created, err := c.CreateGameServerFleet(t.Context(), "ns", fleet)
+	if err != nil {
+		t.Fatalf("create fleet: %v", err)
+	}
+	spec, _ := gotBody["spec"].(map[string]any)
+	if spec["profile"] != "minecraft" || spec["replicas"] != float64(2) {
+		t.Fatalf("unexpected create body: %v", gotBody)
+	}
+	if created.Metadata.Name != "f1" {
+		t.Fatalf("unexpected created fleet: %+v", created)
+	}
+
+	scaled, err := c.ScaleGameServerFleet(t.Context(), "ns", "f1", 5)
+	if err != nil {
+		t.Fatalf("scale fleet: %v", err)
+	}
+	spec, _ = gotBody["spec"].(map[string]any)
+	if spec["replicas"] != float64(5) {
+		t.Fatalf("unexpected patch body: %v", gotBody)
+	}
+	if scaled.Spec.Replicas != 5 {
+		t.Fatalf("unexpected scaled fleet: %+v", scaled)
+	}
+
+	if err := c.DeleteGameServerFleet(t.Context(), "ns", "f1"); err != nil {
+		t.Fatalf("delete fleet: %v", err)
+	}
+}

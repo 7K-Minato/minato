@@ -89,6 +89,14 @@ type StorageSpec struct {
 	// sizeDefault is the default PVC size.
 	// +required
 	SizeDefault string `json:"sizeDefault"`
+
+	// sizeMin is the minimum allowed PVC size (e.g. "10Gi").
+	// +optional
+	SizeMin string `json:"sizeMin,omitempty"`
+
+	// sizeMax is the maximum allowed PVC size (e.g. "200Gi").
+	// +optional
+	SizeMax string `json:"sizeMax,omitempty"`
 }
 
 // CapabilitiesSpec defines optional sidecar capabilities for a game profile.
@@ -143,11 +151,66 @@ type ObservabilitySpec struct {
 	ServiceMonitor *ServiceMonitorSpec `json:"serviceMonitor,omitempty"`
 }
 
+// ResourcesSpec defines the resource tiers for a game profile. The inline
+// ResourceRequirements fields act as the implicit default when no tiers are
+// defined (backward compatible with the previous flat `resources` shape).
+type ResourcesSpec struct {
+	// ResourceRequirements is the flat default applied when no tiers are
+	// defined, or when a GameServer references no tier or an unknown tier.
+	// +optional
+	corev1.ResourceRequirements `json:",inline"`
+
+	// tiers defines named resource presets (e.g. small, medium, large) that a
+	// GameServer can select via spec.tier.
+	// +optional
+	Tiers map[string]corev1.ResourceRequirements `json:"tiers,omitempty"`
+
+	// default names the tier applied when a GameServer does not specify one.
+	// Required when tiers is non-empty; must reference an existing tier.
+	// +optional
+	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Default string `json:"default,omitempty"`
+}
+
+// ForTier resolves the ResourceRequirements for the given tier name.
+// Resolution order: the named tier if it exists, the default tier when no
+// tier is requested, otherwise the flat inline requirements.
+func (s ResourcesSpec) ForTier(tier string) corev1.ResourceRequirements {
+	if len(s.Tiers) > 0 {
+		name := tier
+		if name == "" {
+			name = s.Default
+		}
+		if requirements, ok := s.Tiers[name]; ok {
+			return requirements
+		}
+	}
+	return s.ResourceRequirements
+}
+
 // GameProfileSpec defines the desired state of GameProfile
 type GameProfileSpec struct {
 	// displayName is a human-friendly name for the profile.
 	// +required
 	DisplayName string `json:"displayName"`
+
+	// category groups profiles for storefront browsing (e.g. sandbox, fps,
+	// survival, mmo).
+	// +optional
+	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Category string `json:"category,omitempty"`
+
+	// icon is a URL to an icon image for storefront display.
+	// +optional
+	// +kubebuilder:validation:MaxLength=512
+	Icon string `json:"icon,omitempty"`
+
+	// description is a markdown blurb describing the game for storefronts.
+	// +optional
+	// +kubebuilder:validation:MaxLength=4096
+	Description string `json:"description,omitempty"`
 
 	// image is the game container image.
 	// +required
@@ -165,9 +228,9 @@ type GameProfileSpec struct {
 	// +optional
 	Environment []EnvironmentSpec `json:"environment,omitempty"`
 
-	// resources defines default container resources.
+	// resources defines default container resources and optional named tiers.
 	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources ResourcesSpec `json:"resources,omitempty"`
 
 	// storage defines the default persistent storage settings.
 	// +required

@@ -22,10 +22,12 @@ func TestBuildGameServerPodSpec(t *testing.T) {
 				{Key: "EULA", Default: "true", Required: true},
 				{Key: "OPTIONAL", Default: "value", Required: false},
 			},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("128Mi"),
+			Resources: operatorv1.ResourcesSpec{
+				ResourceRequirements: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
 				},
 			},
 			Storage: operatorv1.StorageSpec{
@@ -123,6 +125,55 @@ func TestBuildGameServerPodSpec(t *testing.T) {
 	}
 	if env["CUSTOM"] != "custom" {
 		t.Fatalf("expected CUSTOM env, got %q", env["CUSTOM"])
+	}
+}
+
+func TestResolveGameResources(t *testing.T) {
+	flat := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+	}
+	small := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("250m")},
+	}
+	large := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+	}
+
+	profileWithTiers := func() *operatorv1.GameProfile {
+		return &operatorv1.GameProfile{
+			Spec: operatorv1.GameProfileSpec{
+				Resources: operatorv1.ResourcesSpec{
+					ResourceRequirements: flat,
+					Default:              "small",
+					Tiers: map[string]corev1.ResourceRequirements{
+						"small": small,
+						"large": large,
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		profile *operatorv1.GameProfile
+		tier    string
+		wantCPU string
+	}{
+		{name: "no tiers uses flat resources", profile: &operatorv1.GameProfile{Spec: operatorv1.GameProfileSpec{Resources: operatorv1.ResourcesSpec{ResourceRequirements: flat}}}, tier: "", wantCPU: "100m"},
+		{name: "explicit tier", profile: profileWithTiers(), tier: "large", wantCPU: "2"},
+		{name: "no tier falls back to default tier", profile: profileWithTiers(), tier: "", wantCPU: "250m"},
+		{name: "unknown tier falls back to flat resources", profile: profileWithTiers(), tier: "huge", wantCPU: "100m"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := &operatorv1.GameServer{Spec: operatorv1.GameServerSpec{Tier: tt.tier}}
+			got := ResolveGameResources(tt.profile, server)
+			if got.Requests.Cpu().String() != tt.wantCPU {
+				t.Fatalf("expected cpu request %s, got %s", tt.wantCPU, got.Requests.Cpu().String())
+			}
+		})
 	}
 }
 

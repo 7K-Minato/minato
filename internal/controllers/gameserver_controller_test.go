@@ -67,7 +67,7 @@ func newTestGameServer() *operatorv1.GameServer {
 			Profile: "mc",
 			Lifecycle: operatorv1.LifecycleSpec{
 				IdleTimeoutSeconds: 0,
-				AutoStart:          true,
+				AutoStart:          ptr.To(true),
 			},
 		},
 	}

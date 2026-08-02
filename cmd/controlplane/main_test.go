@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,6 +26,7 @@ func setupTestAPI(objs ...client.Object) (*controlPlaneAPI, client.Client) {
 	scheme := runtime.NewScheme()
 	_ = operatorv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
+	_ = networkingv1.AddToScheme(scheme)
 
 	builder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...)
 
@@ -278,6 +280,47 @@ func TestCreateGameServer_CreatesNamespace(t *testing.T) {
 	var ns corev1.Namespace
 	if err := c.Get(context.Background(), types.NamespacedName{Name: "tenant-new"}, &ns); err != nil {
 		t.Fatalf("expected namespace to be auto-created: %v", err)
+	}
+}
+
+func TestCreateGameServer_HardensNewNamespace(t *testing.T) {
+	api, c := setupTestAPI()
+	r := newRouter(api)
+
+	gs := operatorv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "gs-new"},
+		Spec:       operatorv1.GameServerSpec{Profile: "minecraft"},
+	}
+	body, _ := json.Marshal(gs)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/gameservers/tenant-hardened", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var ns corev1.Namespace
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "tenant-hardened"}, &ns); err != nil {
+		t.Fatalf("expected namespace: %v", err)
+	}
+	if ns.Labels["minato.io/tenant"] != "tenant-hardened" {
+		t.Fatalf("missing tenant label: %v", ns.Labels)
+	}
+	if ns.Labels["pod-security.kubernetes.io/enforce"] != "restricted" {
+		t.Fatalf("missing PSS labels: %v", ns.Labels)
+	}
+
+	var quota corev1.ResourceQuota
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "minato-tenant-quota", Namespace: "tenant-hardened"}, &quota); err != nil {
+		t.Fatalf("expected default resource quota: %v", err)
+	}
+
+	var np networkingv1.NetworkPolicy
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "minato-tenant-default", Namespace: "tenant-hardened"}, &np); err != nil {
+		t.Fatalf("expected default network policy: %v", err)
 	}
 }
 

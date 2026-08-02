@@ -38,6 +38,7 @@ nav:
       - operations/configuration.md
       - operations/cli.md
       - operations/multi-tenancy.md
+      - operations/lifecycle.md
       - operations/scalability.md
       - operations/metrics-schema.md
       - operations/security.md

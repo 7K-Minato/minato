@@ -89,6 +89,8 @@ type GameServerSpec struct {
 		IdleTimeoutSeconds int32 `json:"idleTimeoutSeconds,omitempty"`
 		AutoStart          bool  `json:"autoStart,omitempty"`
 	} `json:"lifecycle,omitempty"`
+	// LoadBalancerIP pins the external IP of the game service.
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
 
 // SnapshotRef references a snapshot to restore a GameServer from.
@@ -246,6 +248,7 @@ func toGenGameServer(gs *GameServer) gen.GameServer {
 			IdleTimeoutSeconds: &idle,
 		}
 	}
+	out.Spec.LoadBalancerIP = ptrOrNil(gs.Spec.LoadBalancerIP)
 	return out
 }
 
@@ -286,6 +289,7 @@ func fromGenGameServer(in *gen.GameServer) GameServer {
 				out.Spec.Lifecycle.IdleTimeoutSeconds = int32(*in.Spec.Lifecycle.IdleTimeoutSeconds)
 			}
 		}
+		out.Spec.LoadBalancerIP = deref(in.Spec.LoadBalancerIP)
 	}
 	if in.Status != nil {
 		out.Status.State = deref((*string)(in.Status.State))
@@ -448,6 +452,37 @@ func (c *Client) DeleteGameServer(ctx context.Context, namespace, name string) e
 		return apiError(resp.StatusCode(), resp.Body)
 	}
 	return nil
+}
+
+// UpdateGameServerLifecycle patches a GameServer's lifecycle. Pass nil for
+// fields that should be left unchanged. Setting autoStart=false on a running
+// server gracefully stops it (state Stopped); autoStart=true starts a
+// stopped server again.
+func (c *Client) UpdateGameServerLifecycle(ctx context.Context, namespace, name string, autoStart *bool, idleTimeout *int32) (*GameServer, error) {
+	var idle *int
+	if idleTimeout != nil {
+		v := int(*idleTimeout)
+		idle = &v
+	}
+	body := gen.GameServerLifecyclePatch{
+		Spec: &struct {
+			Lifecycle *gen.GameServerLifecycle `json:"lifecycle,omitempty"`
+		}{
+			Lifecycle: &gen.GameServerLifecycle{
+				AutoStart:          autoStart,
+				IdleTimeoutSeconds: idle,
+			},
+		},
+	}
+	resp, err := c.inner.UpdateGameServerLifecycleWithResponse(ctx, namespace, name, body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return nil, apiError(resp.StatusCode(), resp.Body)
+	}
+	out := fromGenGameServer(resp.JSON200)
+	return &out, nil
 }
 
 // Actions
@@ -629,4 +664,67 @@ func (c *Client) GetGameServerFleet(ctx context.Context, namespace, name string)
 	}
 	out := fromGenFleet(*resp.JSON200)
 	return &out, nil
+}
+
+// CreateGameServerFleet creates a GameServerFleet in the namespace (admin
+// only). The namespace is auto-created if missing; the profile must exist.
+func (c *Client) CreateGameServerFleet(ctx context.Context, namespace string, fleet *GameServerFleet) (*GameServerFleet, error) {
+	raw, err := json.Marshal(map[string]any{
+		"apiVersion": "operator.minato.io/v1",
+		"kind":       "GameServerFleet",
+		"metadata":   map[string]any{"name": fleet.Metadata.Name},
+		"spec": map[string]any{
+			"profile":  fleet.Spec.Profile,
+			"replicas": fleet.Spec.Replicas,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	var body gen.GameServerFleet
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return nil, err
+	}
+	resp, err := c.inner.CreateGameServerFleetWithResponse(ctx, namespace, body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != http.StatusCreated {
+		return nil, apiError(resp.StatusCode(), resp.Body)
+	}
+	out := fromGenFleet(*resp.JSON201)
+	return &out, nil
+}
+
+// ScaleGameServerFleet sets a fleet's replica count (operator+).
+func (c *Client) ScaleGameServerFleet(ctx context.Context, namespace, name string, replicas int32) (*GameServerFleet, error) {
+	r := int(replicas)
+	body := gen.GameServerFleetPatch{
+		Spec: &struct {
+			Replicas *int `json:"replicas,omitempty"`
+		}{
+			Replicas: &r,
+		},
+	}
+	resp, err := c.inner.UpdateGameServerFleetWithResponse(ctx, namespace, name, body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return nil, apiError(resp.StatusCode(), resp.Body)
+	}
+	out := fromGenFleet(*resp.JSON200)
+	return &out, nil
+}
+
+// DeleteGameServerFleet deletes a fleet and its GameServers (admin only).
+func (c *Client) DeleteGameServerFleet(ctx context.Context, namespace, name string) error {
+	resp, err := c.inner.DeleteGameServerFleetWithResponse(ctx, namespace, name)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode() != http.StatusNoContent {
+		return apiError(resp.StatusCode(), resp.Body)
+	}
+	return nil
 }

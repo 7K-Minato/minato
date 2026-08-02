@@ -28,9 +28,19 @@ type LifecycleSpec struct {
 	// +optional
 	IdleTimeoutSeconds int32 `json:"idleTimeoutSeconds,omitempty"`
 
-	// autoStart controls whether the server starts automatically.
+	// autoStart controls whether the server should be running. When false,
+	// the operator gracefully stops the server (agent PrepareShutdown, then
+	// scales the StatefulSet to 0) and reports status.state=Stopped. When
+	// true (the default), the server runs.
+	// +kubebuilder:default=true
 	// +optional
-	AutoStart bool `json:"autoStart,omitempty"`
+	AutoStart *bool `json:"autoStart,omitempty"`
+}
+
+// AutoStartEnabled reports whether the server should be running.
+// Unset (nil) autoStart is treated as true.
+func (s LifecycleSpec) AutoStartEnabled() bool {
+	return s.AutoStart == nil || *s.AutoStart
 }
 
 // SnapshotRef references a VolumeSnapshot for restoring a GameServer.
@@ -64,6 +74,13 @@ type GameServerSpec struct {
 	// profile references the GameProfile name.
 	// +required
 	Profile string `json:"profile"`
+
+	// tier selects a resource tier from the GameProfile's spec.resources.tiers.
+	// When empty, the profile's default tier (or flat resources) applies.
+	// +optional
+	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Tier string `json:"tier,omitempty"`
 
 	// env provides environment overrides.
 	// +optional

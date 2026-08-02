@@ -101,10 +101,16 @@ const (
 
 // APIKey defines model for APIKey.
 type APIKey struct {
-	CreatedAt *time.Time  `json:"createdAt,omitempty"`
-	CreatedBy *string     `json:"createdBy,omitempty"`
-	Name      *string     `json:"name,omitempty"`
-	Role      *APIKeyRole `json:"role,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedBy *string    `json:"createdBy,omitempty"`
+
+	// ExpiresAt Optional expiry time; expired keys are rejected with 401
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	Name      *string    `json:"name,omitempty"`
+
+	// Namespaces Namespace patterns the key is restricted to (empty = cluster-wide)
+	Namespaces *[]string   `json:"namespaces,omitempty"`
+	Role       *APIKeyRole `json:"role,omitempty"`
 }
 
 // APIKeyRole defines model for APIKey.Role.
@@ -113,12 +119,14 @@ type APIKeyRole string
 // APIKeyCreated defines model for APIKeyCreated.
 type APIKeyCreated struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 
 	// Key The API key value (shown once)
-	Key     string  `json:"key"`
-	Name    string  `json:"name"`
-	Role    string  `json:"role"`
-	Warning *string `json:"warning,omitempty"`
+	Key        string    `json:"key"`
+	Name       string    `json:"name"`
+	Namespaces *[]string `json:"namespaces,omitempty"`
+	Role       string    `json:"role"`
+	Warning    *string   `json:"warning,omitempty"`
 }
 
 // Action defines model for Action.
@@ -194,8 +202,14 @@ type AuthConfigAuthModes string
 
 // CreateAPIKeyRequest defines model for CreateAPIKeyRequest.
 type CreateAPIKeyRequest struct {
+	// ExpiresAt Optional expiry time (must be in the future)
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+
 	// Name Key name
 	Name string `json:"name"`
+
+	// Namespaces Optional namespace patterns (exact names or trailing-"*" globs such as "tenant-*") restricting the key. Omit for a cluster-wide key.
+	Namespaces *[]string `json:"namespaces,omitempty"`
 
 	// Role Role for the key (defaults to the caller's role)
 	Role *CreateAPIKeyRequestRole `json:"role,omitempty"`
@@ -245,8 +259,17 @@ type GameProfileSpec struct {
 		RestoreFromSnapshot *bool `json:"restoreFromSnapshot,omitempty"`
 		Sftp                *bool `json:"sftp,omitempty"`
 	} `json:"capabilities,omitempty"`
+
+	// Category Storefront category (e.g. sandbox, fps, survival, mmo)
+	Category *string `json:"category,omitempty"`
+
+	// Description Markdown blurb describing the game for storefronts
+	Description *string   `json:"description,omitempty"`
 	DisplayName *string   `json:"displayName,omitempty"`
 	Environment *[]EnvVar `json:"environment,omitempty"`
+
+	// Icon URL to an icon image for storefront display
+	Icon *string `json:"icon,omitempty"`
 
 	// Image Game server container image
 	Image         *string `json:"image,omitempty"`
@@ -262,7 +285,9 @@ type GameProfileSpec struct {
 	} `json:"observability,omitempty"`
 	Ports     *[]Port `json:"ports,omitempty"`
 	Resources *struct {
-		Limits *struct {
+		// Default Name of the tier applied when a GameServer does not specify one
+		Default *string `json:"default,omitempty"`
+		Limits  *struct {
 			Cpu    *string `json:"cpu,omitempty"`
 			Memory *string `json:"memory,omitempty"`
 		} `json:"limits,omitempty"`
@@ -270,6 +295,9 @@ type GameProfileSpec struct {
 			Cpu    *string `json:"cpu,omitempty"`
 			Memory *string `json:"memory,omitempty"`
 		} `json:"requests,omitempty"`
+
+		// Tiers Named resource presets selectable via GameServer spec.tier
+		Tiers *map[string]ResourceRequirements `json:"tiers,omitempty"`
 	} `json:"resources,omitempty"`
 	Storage *struct {
 		MountPath   string  `json:"mountPath"`
@@ -318,6 +346,29 @@ type GameServerFleet struct {
 // GameServerFleetSpecUpdateStrategyType defines model for GameServerFleet.Spec.UpdateStrategy.Type.
 type GameServerFleetSpecUpdateStrategyType string
 
+// GameServerFleetPatch Strict merge-patch for fleet scaling. Only spec.replicas is accepted; unknown fields are rejected with 400.
+type GameServerFleetPatch struct {
+	Spec *struct {
+		Replicas *int `json:"replicas,omitempty"`
+	} `json:"spec,omitempty"`
+}
+
+// GameServerLifecycle defines model for GameServerLifecycle.
+type GameServerLifecycle struct {
+	// AutoStart Whether the server should be running. false gracefully stops a running server (agent PrepareShutdown, scale to 0, state Stopped); true starts a stopped server again.
+	AutoStart *bool `json:"autoStart,omitempty"`
+
+	// IdleTimeoutSeconds Seconds of player-idle time before auto-shutdown (0 = never)
+	IdleTimeoutSeconds *int `json:"idleTimeoutSeconds,omitempty"`
+}
+
+// GameServerLifecyclePatch Strict merge-patch for GameServer lifecycle control. Only spec.lifecycle.autoStart / spec.lifecycle.idleTimeoutSeconds are accepted; unknown fields are rejected with 400.
+type GameServerLifecyclePatch struct {
+	Spec *struct {
+		Lifecycle *GameServerLifecycle `json:"lifecycle,omitempty"`
+	} `json:"spec,omitempty"`
+}
+
 // GameServerSpec defines model for GameServerSpec.
 type GameServerSpec struct {
 	// Env Environment variables
@@ -334,6 +385,9 @@ type GameServerSpec struct {
 	// Profile Reference to GameProfile name
 	Profile *string      `json:"profile,omitempty"`
 	Storage *StorageSpec `json:"storage,omitempty"`
+
+	// Tier Resource tier from the GameProfile's spec.resources.tiers
+	Tier *string `json:"tier,omitempty"`
 }
 
 // GameServerStatus defines model for GameServerStatus.
@@ -399,6 +453,18 @@ type Port struct {
 // PortProtocol defines model for Port.Protocol.
 type PortProtocol string
 
+// ResourceRequirements defines model for ResourceRequirements.
+type ResourceRequirements struct {
+	Limits *struct {
+		Cpu    *string `json:"cpu,omitempty"`
+		Memory *string `json:"memory,omitempty"`
+	} `json:"limits,omitempty"`
+	Requests *struct {
+		Cpu    *string `json:"cpu,omitempty"`
+		Memory *string `json:"memory,omitempty"`
+	} `json:"requests,omitempty"`
+}
+
 // StorageSpec defines model for StorageSpec.
 type StorageSpec struct {
 	Size        *string `json:"size,omitempty"`
@@ -433,8 +499,17 @@ type ExecuteActionJSONBody map[string]string
 // CreateAPIKeyJSONRequestBody defines body for CreateAPIKey for application/json ContentType.
 type CreateAPIKeyJSONRequestBody = CreateAPIKeyRequest
 
+// CreateGameServerFleetJSONRequestBody defines body for CreateGameServerFleet for application/json ContentType.
+type CreateGameServerFleetJSONRequestBody = GameServerFleet
+
+// UpdateGameServerFleetJSONRequestBody defines body for UpdateGameServerFleet for application/json ContentType.
+type UpdateGameServerFleetJSONRequestBody = GameServerFleetPatch
+
 // CreateGameServerJSONRequestBody defines body for CreateGameServer for application/json ContentType.
 type CreateGameServerJSONRequestBody = GameServer
+
+// UpdateGameServerLifecycleJSONRequestBody defines body for UpdateGameServerLifecycle for application/json ContentType.
+type UpdateGameServerLifecycleJSONRequestBody = GameServerLifecyclePatch
 
 // ExecuteActionJSONRequestBody defines body for ExecuteAction for application/json ContentType.
 type ExecuteActionJSONRequestBody ExecuteActionJSONBody
@@ -453,9 +528,18 @@ type ServerInterface interface {
 	// List fleets
 	// (GET /api/v1/gameserverfleets)
 	ListGameServerFleets(w http.ResponseWriter, r *http.Request)
+	// Create fleet
+	// (POST /api/v1/gameserverfleets/{namespace})
+	CreateGameServerFleet(w http.ResponseWriter, r *http.Request, namespace string)
+	// Delete fleet
+	// (DELETE /api/v1/gameserverfleets/{namespace}/{name})
+	DeleteGameServerFleet(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name)
 	// Get fleet
 	// (GET /api/v1/gameserverfleets/{namespace}/{name})
 	GetGameServerFleet(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name)
+	// Scale fleet
+	// (PATCH /api/v1/gameserverfleets/{namespace}/{name})
+	UpdateGameServerFleet(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name)
 	// List game servers
 	// (GET /api/v1/gameservers)
 	ListGameServers(w http.ResponseWriter, r *http.Request)
@@ -468,6 +552,9 @@ type ServerInterface interface {
 	// Get game server
 	// (GET /api/v1/gameservers/{namespace}/{name})
 	GetGameServer(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name)
+	// Patch game server lifecycle
+	// (PATCH /api/v1/gameservers/{namespace}/{name})
+	UpdateGameServerLifecycle(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name)
 	// List available actions
 	// (GET /api/v1/gameservers/{namespace}/{name}/actions)
 	ListActions(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name)
@@ -531,9 +618,27 @@ func (_ Unimplemented) ListGameServerFleets(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Create fleet
+// (POST /api/v1/gameserverfleets/{namespace})
+func (_ Unimplemented) CreateGameServerFleet(w http.ResponseWriter, r *http.Request, namespace string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete fleet
+// (DELETE /api/v1/gameserverfleets/{namespace}/{name})
+func (_ Unimplemented) DeleteGameServerFleet(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Get fleet
 // (GET /api/v1/gameserverfleets/{namespace}/{name})
 func (_ Unimplemented) GetGameServerFleet(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Scale fleet
+// (PATCH /api/v1/gameserverfleets/{namespace}/{name})
+func (_ Unimplemented) UpdateGameServerFleet(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -558,6 +663,12 @@ func (_ Unimplemented) DeleteGameServer(w http.ResponseWriter, r *http.Request, 
 // Get game server
 // (GET /api/v1/gameservers/{namespace}/{name})
 func (_ Unimplemented) GetGameServer(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Patch game server lifecycle
+// (PATCH /api/v1/gameservers/{namespace}/{name})
+func (_ Unimplemented) UpdateGameServerLifecycle(w http.ResponseWriter, r *http.Request, namespace Namespace, name Name) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -743,6 +854,85 @@ func (siw *ServerInterfaceWrapper) ListGameServerFleets(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// CreateGameServerFleet operation middleware
+func (siw *ServerInterfaceWrapper) CreateGameServerFleet(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "namespace" -------------
+	var namespace string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "namespace", chi.URLParam(r, "namespace"), &namespace, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "namespace", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGameServerFleet(w, r, namespace)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteGameServerFleet operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGameServerFleet(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "namespace" -------------
+	var namespace Namespace
+
+	err = runtime.BindStyledParameterWithOptions("simple", "namespace", chi.URLParam(r, "namespace"), &namespace, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "namespace", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name Name
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteGameServerFleet(w, r, namespace, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetGameServerFleet operation middleware
 func (siw *ServerInterfaceWrapper) GetGameServerFleet(w http.ResponseWriter, r *http.Request) {
 
@@ -778,6 +968,50 @@ func (siw *ServerInterfaceWrapper) GetGameServerFleet(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGameServerFleet(w, r, namespace, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateGameServerFleet operation middleware
+func (siw *ServerInterfaceWrapper) UpdateGameServerFleet(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "namespace" -------------
+	var namespace Namespace
+
+	err = runtime.BindStyledParameterWithOptions("simple", "namespace", chi.URLParam(r, "namespace"), &namespace, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "namespace", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name Name
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateGameServerFleet(w, r, namespace, name)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -925,6 +1159,50 @@ func (siw *ServerInterfaceWrapper) GetGameServer(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGameServer(w, r, namespace, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateGameServerLifecycle operation middleware
+func (siw *ServerInterfaceWrapper) UpdateGameServerLifecycle(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "namespace" -------------
+	var namespace Namespace
+
+	err = runtime.BindStyledParameterWithOptions("simple", "namespace", chi.URLParam(r, "namespace"), &namespace, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "namespace", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name Name
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateGameServerLifecycle(w, r, namespace, name)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1443,7 +1721,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/gameserverfleets", wrapper.ListGameServerFleets)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/gameserverfleets/{namespace}", wrapper.CreateGameServerFleet)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/gameserverfleets/{namespace}/{name}", wrapper.DeleteGameServerFleet)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/gameserverfleets/{namespace}/{name}", wrapper.GetGameServerFleet)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/api/v1/gameserverfleets/{namespace}/{name}", wrapper.UpdateGameServerFleet)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/gameservers", wrapper.ListGameServers)
@@ -1456,6 +1743,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/gameservers/{namespace}/{name}", wrapper.GetGameServer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/api/v1/gameservers/{namespace}/{name}", wrapper.UpdateGameServerLifecycle)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/gameservers/{namespace}/{name}/actions", wrapper.ListActions)
@@ -1497,72 +1787,90 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"AP//NhBesAlpAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -7,6 +7,11 @@ metadata:
   name: gameprofile-sample
 spec:
   displayName: "Minecraft (Sample)"
+  category: sandbox
+  icon: "https://example.com/icons/minecraft.png"
+  description: |
+    Minecraft Java Edition server with Paper support.
+    Persistent world, RCON console, and automated backups.
   image: "example.com/minato/game:latest"
   ports:
     - name: game
@@ -23,6 +28,22 @@ spec:
     limits:
       cpu: 1
       memory: 1Gi
+    default: small
+    tiers:
+      small:
+        requests:
+          cpu: 250m
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
+      large:
+        requests:
+          cpu: 1
+          memory: 4Gi
+        limits:
+          cpu: 2
+          memory: 8Gi
   storage:
     mountPath: /data
     sizeDefault: 10Gi

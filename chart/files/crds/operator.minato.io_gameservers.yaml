@@ -48,7 +48,12 @@ spec:
                 description: lifecycle defines lifecycle settings.
                 properties:
                   autoStart:
-                    description: autoStart controls whether the server starts automatically.
+                    default: true
+                    description: |-
+                      autoStart controls whether the server should be running. When false,
+                      the operator gracefully stops the server (agent PrepareShutdown, then
+                      scales the StatefulSet to 0) and reports status.state=Stopped. When
+                      true (the default), the server runs.
                     type: boolean
                   idleTimeoutSeconds:
                     description: |-
@@ -95,6 +100,13 @@ spec:
                     description: storageClass overrides the default StorageClass.
                     type: string
                 type: object
+              tier:
+                description: |-
+                  tier selects a resource tier from the GameProfile's spec.resources.tiers.
+                  When empty, the profile's default tier (or flat resources) applies.
+                maxLength: 32
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
               topologySpreadConstraints:
                 description: |-
                   topologySpreadConstraints control how pods are spread across topology domains

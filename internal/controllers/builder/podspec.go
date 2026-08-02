@@ -42,7 +42,7 @@ func BuildGameServerPodSpecWithPullSecrets(profile *operatorv1.GameProfile, serv
 		Image:        profile.Spec.Image,
 		Ports:        gamePorts,
 		Env:          gameEnv,
-		Resources:    profile.Spec.Resources,
+		Resources:    ResolveGameResources(profile, server),
 		VolumeMounts: buildDataVolumeMounts(profile),
 	}
 
@@ -83,6 +83,14 @@ func BuildGameServerPodSpecWithPullSecrets(profile *operatorv1.GameProfile, serv
 	}
 
 	return podSpec, nil
+}
+
+// ResolveGameResources returns the ResourceRequirements for the game
+// container, honoring the tier selected by the GameServer. Falls back to the
+// profile's default tier, then to the flat inline resources, when the server
+// requests no tier or an unknown tier.
+func ResolveGameResources(profile *operatorv1.GameProfile, server *operatorv1.GameServer) corev1.ResourceRequirements {
+	return profile.Spec.Resources.ForTier(server.Spec.Tier)
 }
 
 func buildGameEnv(profile *operatorv1.GameProfile, server *operatorv1.GameServer) []corev1.EnvVar {
