@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/7k-minato/minato/sdk/controlplane/gen"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Client talks to a single minato control plane.
@@ -29,7 +30,12 @@ func NewClient(baseURL, apiKey string, timeout time.Duration) (*Client, error) {
 	}
 	inner, err := gen.NewClientWithResponses(
 		strings.TrimSuffix(baseURL, "/"),
-		gen.WithHTTPClient(&http.Client{Timeout: timeout}),
+		// otelhttp emits a client span per call and injects W3C trace
+		// context; with the default no-op provider it is free.
+		gen.WithHTTPClient(&http.Client{
+			Timeout:   timeout,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
+		}),
 		gen.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 			req.Header.Set("Accept", "application/json")
 			if apiKey != "" {

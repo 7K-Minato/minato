@@ -5,8 +5,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func newTestServer(t *testing.T, handler http.HandlerFunc) (*Client, *httptest.Server) {
@@ -261,6 +267,33 @@ func TestFleetWriteEndpoints(t *testing.T) {
 
 	if err := c.DeleteGameServerFleet(t.Context(), "ns", "f1"); err != nil {
 		t.Fatalf("delete fleet: %v", err)
+	}
+}
+
+func TestTraceContextPropagation(t *testing.T) {
+	var gotTraceparent string
+	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotTraceparent = r.Header.Get("traceparent")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]map[string]any{})
+	})
+
+	sr := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
+	prevProp := otel.GetTextMapPropagator()
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() { otel.SetTextMapPropagator(prevProp) })
+	ctx, span := tp.Tracer("test").Start(t.Context(), "parent")
+	defer span.End()
+
+	if _, err := c.ListGameServers(ctx); err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if gotTraceparent == "" {
+		t.Fatal("control plane request did not carry a traceparent header")
+	}
+	if !strings.Contains(gotTraceparent, span.SpanContext().TraceID().String()) {
+		t.Fatalf("traceparent %q does not reference parent trace %s", gotTraceparent, span.SpanContext().TraceID())
 	}
 }
 
