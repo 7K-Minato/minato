@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/7K-Minato/minato/compare/v1.2.1...v1.3.0) (2026-08-06)
+
+
+### Features
+
+* openapi contracts ([#32](https://github.com/7K-Minato/minato/issues/32)) ([c4cc39b](https://github.com/7K-Minato/minato/commit/c4cc39bc9ce7f58b999971375eb04001b0a9d62e))
+* OpenAPI-first control plane contracts and published Go SDK ([#30](https://github.com/7K-Minato/minato/issues/30)) ([92631a0](https://github.com/7K-Minato/minato/commit/92631a0abf1933d62b034380d48451819aa317d8))
+
 ## [1.2.1](https://github.com/7K-Minato/minato/compare/v1.2.0...v1.2.1) (2026-07-15)
 
 
