@@ -22,6 +22,11 @@ operator:
     pullPolicy: IfNotPresent
   
   replicas: 2
+
+  # imagePullSecrets lists secret names to attach to game server pods. Each must
+  # exist in the operator's namespace; the operator replicates them into every
+  # GameServer namespace automatically.
+  imagePullSecrets: []
   
   resources:
     limits:
@@ -226,3 +231,38 @@ global:
 # Testing
 tests:
   enabled: true
+
+registrar:
+  # Registers this cluster with minato cloud and keeps it alive via heartbeats.
+  enabled: false
+  image:
+    repository: harbor.7kgroup.org/7kminato/minato-registrar
+    tag: ""
+    pullPolicy: IfNotPresent
+  # cloudUrl is the minato cloud API base URL (required when enabled).
+  cloudUrl: ""
+  # clusterName is the fleet-wide unique name of this cluster (required when enabled).
+  clusterName: ""
+  region: ""
+  capacityMax: 100
+  heartbeatInterval: 30s
+  # controlplaneUrl defaults to the in-cluster control plane service.
+  controlplaneUrl: ""
+  dedicatedTenantId: ""
+  # clusterFingerprint overrides the auto-detected cluster fingerprint (kube-system
+  # namespace UID) sent during registration and heartbeats. Leave empty to auto-detect.
+  clusterFingerprint: ""
+  # Secrets holding the cloud registration token and the control plane API key.
+  registerTokenSecret:
+    name: minato-registrar
+    key: register-token
+  controlplaneKeySecret:
+    name: minato-registrar
+    key: controlplane-api-key
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi

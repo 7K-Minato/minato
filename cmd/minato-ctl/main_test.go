@@ -1,84 +1,58 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-func TestGetJSON(t *testing.T) {
+func TestNewClient(t *testing.T) {
+	serverAddr = "http://localhost:8080"
+	apiKey = "k"
+	if _, err := newClient(); err != nil {
+		t.Fatalf("newClient: %v", err)
+	}
+
+	serverAddr = "://bad-url"
+	if _, err := newClient(); err == nil {
+		t.Fatal("expected error for invalid server address")
+	}
+}
+
+func TestListServersViaSDK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/test" {
+		if r.Header.Get("Authorization") != "Bearer test-key" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path == "/api/v1/gameservers" {
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-		} else {
-			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"metadata": map[string]any{"name": "gs1", "namespace": "minato"}, "spec": map[string]any{"profile": "minecraft"}},
+			})
+			return
 		}
-	}))
-	defer server.Close()
-
-	serverAddr = server.URL
-
-	// Should not error on valid response
-	err := getJSON("/api/v1/test")
-	if err != nil {
-		t.Fatalf("getJSON failed: %v", err)
-	}
-}
-
-func TestGetJSON_NotFound(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 	}))
 	defer server.Close()
 
 	serverAddr = server.URL
+	apiKey = "test-key"
 
-	// Should not fail on 404, just print the error response
-	err := getJSON("/api/v1/missing")
+	c, err := newClient()
 	if err != nil {
-		t.Fatalf("getJSON should not fail on 404: %v", err)
+		t.Fatalf("newClient: %v", err)
 	}
-}
-
-func TestPostJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Fatalf("expected POST, got %s", r.Method)
-		}
-
-		var body map[string]string
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode body: %v", err)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(body)
-	}))
-	defer server.Close()
-
-	serverAddr = server.URL
-
-	data := map[string]string{"key": "value"}
-	err := postJSON("/api/v1/test", data)
+	servers, err := c.ListGameServers(context.Background())
 	if err != nil {
-		t.Fatalf("postJSON failed: %v", err)
+		t.Fatalf("ListGameServers: %v", err)
 	}
-}
-
-func TestPostJSON_NilData(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "created"})
-	}))
-	defer server.Close()
-
-	serverAddr = server.URL
-
-	err := postJSON("/api/v1/test", nil)
-	if err != nil {
-		t.Fatalf("postJSON with nil data failed: %v", err)
+	if len(servers) != 1 || servers[0].Metadata.Name != "gs1" || servers[0].Spec.Profile != "minecraft" {
+		t.Fatalf("unexpected servers: %+v", servers)
+	}
+	if err := printJSON(servers); err != nil {
+		t.Fatalf("printJSON: %v", err)
 	}
 }

@@ -35,6 +35,17 @@ type APIKeyEntry struct {
 	Username  string    `json:"username"` // Human-readable username
 	Role      string    `json:"role"`     // Role assigned to this key
 	CreatedAt time.Time `json:"createdAt"`
+	// Namespaces optionally restricts the key to a set of namespace patterns
+	// (exact names or trailing-"*" prefix globs). Empty means cluster-wide.
+	Namespaces []string `json:"namespaces,omitempty"`
+	// ExpiresAt optionally sets an expiry time; expired keys are rejected
+	// with 401.
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+}
+
+// Expired reports whether the key has passed its expiry time.
+func (e *APIKeyEntry) Expired() bool {
+	return e.ExpiresAt != nil && time.Now().After(*e.ExpiresAt)
 }
 
 // NewAPIKeyStorage creates a new API key storage backend.
@@ -47,7 +58,9 @@ func NewAPIKeyStorage(c client.Client, namespace string) *APIKeyStorage {
 
 // GenerateKey creates a new API key for a user.
 // Returns the key value (which should be shown to the user ONCE) and the entry.
-func (s *APIKeyStorage) GenerateKey(ctx context.Context, name, userID, username, role string) (*APIKeyEntry, string, error) {
+// namespaces and expiresAt are optional: pass nil for a cluster-wide key
+// without expiry.
+func (s *APIKeyStorage) GenerateKey(ctx context.Context, name, userID, username, role string, namespaces []string, expiresAt *time.Time) (*APIKeyEntry, string, error) {
 	// Generate random key
 	keyValue, err := generateRandomKey()
 	if err != nil {
@@ -55,12 +68,14 @@ func (s *APIKeyStorage) GenerateKey(ctx context.Context, name, userID, username,
 	}
 
 	entry := &APIKeyEntry{
-		Name:      name,
-		KeyID:     keyValue,
-		UserID:    userID,
-		Username:  username,
-		Role:      role,
-		CreatedAt: time.Now(),
+		Name:       name,
+		KeyID:      keyValue,
+		UserID:     userID,
+		Username:   username,
+		Role:       role,
+		CreatedAt:  time.Now(),
+		Namespaces: namespaces,
+		ExpiresAt:  expiresAt,
 	}
 
 	// Store in Kubernetes Secret
@@ -85,7 +100,11 @@ func (s *APIKeyStorage) GetKey(ctx context.Context, keyValue string) (*APIKeyEnt
 
 	for _, secret := range secrets.Items {
 		if string(secret.Data["key"]) == keyValue {
-			return s.fromSecret(&secret), nil
+			entry := s.fromSecret(&secret)
+			if entry.Expired() {
+				return nil, ErrUnauthorized
+			}
+			return entry, nil
 		}
 	}
 
@@ -133,6 +152,16 @@ func (s *APIKeyStorage) DeleteKey(ctx context.Context, name string) error {
 // toSecret converts an APIKeyEntry to a Kubernetes Secret.
 func (s *APIKeyStorage) toSecret(entry *APIKeyEntry) *corev1.Secret {
 	data, _ := json.Marshal(entry)
+	stringData := map[string]string{
+		"key":      entry.KeyID,
+		"metadata": string(data),
+	}
+	if len(entry.Namespaces) > 0 {
+		stringData["namespaces"] = strings.Join(entry.Namespaces, ",")
+	}
+	if entry.ExpiresAt != nil {
+		stringData["expiresAt"] = entry.ExpiresAt.UTC().Format(time.RFC3339)
+	}
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apiKeySecretPrefix + entry.Name,
@@ -142,10 +171,7 @@ func (s *APIKeyStorage) toSecret(entry *APIKeyEntry) *corev1.Secret {
 				"minato.io/created-by": entry.Username,
 			},
 		},
-		StringData: map[string]string{
-			"key":      entry.KeyID,
-			"metadata": string(data),
-		},
+		StringData: stringData,
 	}
 }
 
@@ -161,6 +187,16 @@ func (s *APIKeyStorage) fromSecret(secret *corev1.Secret) *APIKeyEntry {
 	}
 	if entry.Name == "" {
 		entry.Name = strings.TrimPrefix(secret.Name, apiKeySecretPrefix)
+	}
+	// Explicit top-level data fields take precedence over the metadata JSON,
+	// so operators can scope or expire a key by editing the Secret directly.
+	if v := secret.Data["namespaces"]; len(v) > 0 {
+		entry.Namespaces = ParseNamespaces(string(v))
+	}
+	if v := secret.Data["expiresAt"]; len(v) > 0 {
+		if t, err := time.Parse(time.RFC3339, string(v)); err == nil {
+			entry.ExpiresAt = &t
+		}
 	}
 	return entry
 }

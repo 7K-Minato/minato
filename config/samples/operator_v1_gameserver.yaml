@@ -4,5 +4,6 @@ metadata:
   name: gameserver-sample
 spec:
   profile: gameprofile-sample
+  tier: small
   env:
     EULA: "true"

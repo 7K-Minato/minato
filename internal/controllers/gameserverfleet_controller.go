@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"maps"
 	"sort"
+	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	agentv1 "github.com/7k-minato/minato/api/agent/v1/minato/agent/v1"
 	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
 
@@ -23,11 +27,20 @@ const (
 	// Fleet labels
 	fleetLabel           = "minato.io/fleet"
 	fleetGenerationLabel = "minato.io/fleet-generation"
+
+	// defaultDrainTimeoutSeconds bounds the graceful agent shutdown before a
+	// GameServer is deleted when the fleet does not set
+	// spec.updateStrategy.rollingUpdate.drainTimeoutSeconds.
+	defaultDrainTimeoutSeconds = 30
 )
 
 type GameServerFleetReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	// Recorder emits Kubernetes events (e.g. drain timeouts during scale-down
+	// or rolling updates). May be nil in tests.
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameserverfleets,verbs=get;list;watch;create;update;patch;delete
@@ -104,7 +117,7 @@ func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		toDelete := r.selectServersToDelete(existingServers.Items, desiredReplicas, updateStrategy)
 		for _, server := range toDelete {
 			// Graceful drain: call agent shutdown before deletion
-			r.drainServer(ctx, &server)
+			r.drainServer(ctx, fleet, &server)
 			if err := r.Delete(ctx, &server); err != nil && !apierrors.IsNotFound(err) {
 				logger.Error(err, "failed to delete GameServer", "name", server.Name)
 				return ctrl.Result{}, err
@@ -162,9 +175,12 @@ func (r *GameServerFleetReconciler) selectServersToDelete(
 	return sorted[:excess]
 }
 
-// drainServer gracefully shuts down a GameServer before deletion.
-// This triggers the agent to save the world, notify players, etc.
-func (r *GameServerFleetReconciler) drainServer(ctx context.Context, server *operatorv1.GameServer) {
+// drainServer gracefully shuts down a GameServer before deletion by calling
+// the pod agent's PrepareShutdown gRPC (save world, notify players, etc.).
+// The per-pod drain budget is spec.updateStrategy.rollingUpdate.
+// drainTimeoutSeconds (default 30s); on timeout or agent error the caller
+// proceeds with deletion and a warning is logged/evented.
+func (r *GameServerFleetReconciler) drainServer(ctx context.Context, fleet *operatorv1.GameServerFleet, server *operatorv1.GameServer) {
 	logger := log.FromContext(ctx)
 
 	// Only drain if server is running and has an agent
@@ -172,12 +188,43 @@ func (r *GameServerFleetReconciler) drainServer(ctx context.Context, server *ope
 		return
 	}
 
-	// Call agent shutdown (similar to idle timeout logic)
-	logger.Info("draining GameServer before deletion", "name", server.Name)
+	timeoutSeconds := int32(defaultDrainTimeoutSeconds)
+	if fleet != nil && fleet.Spec.UpdateStrategy.RollingUpdate != nil &&
+		fleet.Spec.UpdateStrategy.RollingUpdate.DrainTimeoutSeconds > 0 {
+		timeoutSeconds = fleet.Spec.UpdateStrategy.RollingUpdate.DrainTimeoutSeconds
+	}
 
-	// TODO: Implement agent shutdown call via gRPC
-	// For now, just log and proceed
-	// In production, this would call the agent's PrepareShutdown endpoint
+	logger.Info("draining GameServer before deletion", "name", server.Name, "timeoutSeconds", timeoutSeconds)
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	conn, err := dialAgent(server)
+	if err != nil {
+		r.warnDrainFailed(server, "AgentDialFailed", err)
+		return
+	}
+	defer func() { _ = conn.Close() }()
+
+	agentClient := agentv1.NewAgentClient(conn)
+	_, err = agentClient.PrepareShutdown(ctx, &agentv1.ShutdownRequest{
+		TimeoutSeconds: timeoutSeconds,
+		DrainReason:    "fleet scale-down",
+	})
+	if err != nil {
+		r.warnDrainFailed(server, "AgentShutdownFailed", err)
+	}
+}
+
+// warnDrainFailed logs and emits a warning event for a failed/timed-out drain.
+// Deletion proceeds regardless; this is advisory only.
+func (r *GameServerFleetReconciler) warnDrainFailed(server *operatorv1.GameServer, reason string, err error) {
+	log.Log.Info("agent drain failed, proceeding with deletion",
+		"server", server.Name, "namespace", server.Namespace, "reason", reason, "error", err.Error())
+	if r.Recorder != nil {
+		r.Recorder.Eventf(server, corev1.EventTypeWarning, reason,
+			"graceful agent shutdown failed, deleting anyway: %v", err)
+	}
 }
 
 // handleRollingUpdate updates GameServers when the fleet template changes.

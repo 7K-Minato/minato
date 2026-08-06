@@ -15,6 +15,11 @@ metadata:
   name: minecraft-paper
 spec:
   displayName: "Minecraft Paper"
+  category: sandbox
+  icon: "https://example.com/icons/minecraft.png"
+  description: |
+    Vanilla-compatible Minecraft server (Paper). Persistent world,
+    RCON console, file manager, and scheduled backups.
   image: "itzg/minecraft-server:latest"
   imagePullPolicy: IfNotPresent
   
@@ -44,6 +49,22 @@ spec:
     limits:
       cpu: 2
       memory: 4Gi
+    default: small
+    tiers:
+      small:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+      large:
+        requests:
+          cpu: 1
+          memory: 4Gi
+        limits:
+          cpu: 4
+          memory: 8Gi
   
   storage:
     mountPath: /data
@@ -79,11 +100,14 @@ spec:
 | Field | Type | Required | Description |
 | ------- | ------ | ---------- | ------------- |
 | `displayName` | string | Yes | Human-friendly name |
+| `category` | string | No | Storefront category (e.g. sandbox, fps, mmo); lowercase alphanumeric/dashes, max 32 chars |
+| `icon` | string | No | URL to an icon image (max 512 chars) |
+| `description` | string | No | Markdown storefront blurb (max 4096 chars) |
 | `image` | string | Yes | Game container image |
 | `imagePullPolicy` | string | No | Image pull policy (Always/IfNotPresent/Never) |
 | `ports` | []PortSpec | No | Game ports to expose |
 | `environment` | []EnvironmentSpec | No | Configurable environment variables |
-| `resources` | ResourceRequirements | No | Default container resources |
+| `resources` | ResourcesSpec | No | Default container resources and named tiers |
 | `storage` | StorageSpec | Yes | Persistent storage configuration |
 | `agent` | AgentSpec | Yes | Per-game agent configuration |
 | `actions` | []ActionDecl | No | Declared action catalog |
@@ -107,6 +131,36 @@ capabilities:
 | `restoreFromSnapshot` | bool | No | Enable restore from snapshot |
 
 ## GameProfile Spec Types
+
+### ResourcesSpec
+
+```yaml
+resources:
+  requests:            # flat default (used when no tiers are defined,
+    cpu: 500m          # or the requested tier is unknown)
+    memory: 2Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+  default: small       # tier applied when a GameServer omits spec.tier
+  tiers:
+    small:
+      requests: { cpu: 500m, memory: 2Gi }
+      limits:   { cpu: 2,    memory: 4Gi }
+    large:
+      requests: { cpu: 1,    memory: 4Gi }
+      limits:   { cpu: 4,    memory: 8Gi }
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `requests`/`limits` | ResourceRequirements | No | Flat default resources (backward compatible) |
+| `tiers` | map[string]ResourceRequirements | No | Named resource presets selectable via GameServer `spec.tier` |
+| `default` | string | Yes, when `tiers` is set | Tier applied when a GameServer does not specify one; must name an existing tier |
+
+Tier names must be lowercase alphanumeric or dashes, max 32 characters. When a
+GameServer requests no tier or an unknown tier, the default tier (or the flat
+resources when no tiers are defined) applies.
 
 ### PortSpec
 
@@ -201,6 +255,7 @@ metadata:
   namespace: default
 spec:
   profile: minecraft-paper
+  tier: large
   env:
     EULA: "true"
     MEMORY: "4G"
@@ -214,6 +269,7 @@ spec:
 | Field | Type | Required | Description |
 | ------- | ------ | ---------- | ------------- |
 | `profile` | string | Yes | GameProfile name |
+| `tier` | string | No | Resource tier from the profile's `resources.tiers` (defaults to the profile's default tier) |
 | `env` | map[string]string | No | Environment overrides |
 | `lifecycle` | LifecycleSpec | No | Lifecycle settings |
 

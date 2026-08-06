@@ -67,7 +67,7 @@ func newTestGameServer() *operatorv1.GameServer {
 			Profile: "mc",
 			Lifecycle: operatorv1.LifecycleSpec{
 				IdleTimeoutSeconds: 0,
-				AutoStart:          true,
+				AutoStart:          ptr.To(true),
 			},
 		},
 	}
@@ -408,20 +408,177 @@ func TestGameServerReconciler_UpdateStatus(t *testing.T) {
 	scheme := newTestScheme()
 	ctx := context.Background()
 	server := newTestGameServer()
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).WithStatusSubresource(&operatorv1.GameServer{}).Build()
+	profile := newTestProfile()
+	gameSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace},
+		Status: corev1.ServiceStatus{
+			LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{{IP: "10.0.0.50"}},
+			},
+		},
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, gameSvc).WithStatusSubresource(&operatorv1.GameServer{}).Build()
 	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
 
-	err := reconciler.updateStatus(ctx, server, true)
+	err := reconciler.updateStatus(ctx, server, profile, true)
 	require.NoError(t, err)
 	assert.Equal(t, stateRunning, server.Status.State)
 	assert.Len(t, server.Status.Conditions, 2)
 	assert.Equal(t, metav1.ConditionTrue, server.Status.Conditions[0].Status)
 	assert.Equal(t, "AgentReachable", server.Status.Conditions[1].Type)
 
-	err = reconciler.updateStatus(ctx, server, false)
+	require.Len(t, server.Status.Endpoints, len(profile.Spec.Ports))
+	assert.Equal(t, "10.0.0.50", server.Status.Endpoints[0].Address)
+	assert.Equal(t, profile.Spec.Ports[0].ContainerPort, server.Status.Endpoints[0].Port)
+
+	err = reconciler.updateStatus(ctx, server, profile, false)
 	require.NoError(t, err)
 	assert.Equal(t, stateProvisioning, server.Status.State)
 	assert.Equal(t, metav1.ConditionFalse, server.Status.Conditions[0].Status)
+}
+
+func TestGameServerReconciler_ResolveEndpointsPendingLB(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	// Service exists but no ingress assigned yet.
+	gameSvc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace}}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, gameSvc).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
+
+	assert.Empty(t, reconciler.resolveEndpoints(context.Background(), server, newTestProfile()))
+}
+
+func TestGameServerReconciler_ResolveEndpointsHostname(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	gameSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace},
+		Status: corev1.ServiceStatus{
+			LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{{Hostname: "mc-1.games.example.com"}},
+			},
+		},
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server, gameSvc).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme}
+
+	endpoints := reconciler.resolveEndpoints(context.Background(), server, newTestProfile())
+	require.Len(t, endpoints, len(newTestProfile().Spec.Ports))
+	assert.Equal(t, "mc-1.games.example.com", endpoints[0].Address)
+}
+
+func TestBuildGameService(t *testing.T) {
+	server := newTestGameServer()
+	profile := newTestProfile()
+	labels := buildGameServerLabels(server, profile)
+
+	svc := buildGameService(server, profile, labels, "")
+	assert.Equal(t, corev1.ServiceTypeLoadBalancer, svc.Spec.Type)
+	assert.Equal(t, server.Name+"-game", svc.Name)
+	assert.Equal(t, labels, svc.Spec.Selector)
+	assert.Empty(t, svc.Annotations)
+	require.Len(t, svc.Spec.Ports, len(profile.Spec.Ports))
+	assert.Equal(t, int32(25565), svc.Spec.Ports[0].Port)
+
+	// rcon excluded via exposed:false
+	hidden := false
+	profile.Spec.Ports = append(profile.Spec.Ports,
+		operatorv1.PortSpec{Name: "rcon", ContainerPort: 25575, Protocol: corev1.ProtocolTCP, Exposed: &hidden},
+		operatorv1.PortSpec{Name: "game-dup", ContainerPort: 25565, Protocol: corev1.ProtocolTCP},
+	)
+	svc = buildGameService(server, profile, labels, "")
+	names := []string{}
+	for _, p := range svc.Spec.Ports {
+		names = append(names, p.Name)
+	}
+	assert.NotContains(t, names, "rcon")
+	assert.NotContains(t, names, "game-dup", "duplicate port+protocol must be deduped")
+}
+
+func TestBuildGameServicePinAndDNS(t *testing.T) {
+	server := newTestGameServer()
+	server.Spec.LoadBalancerIP = "10.0.0.99"
+	profile := newTestProfile()
+	labels := buildGameServerLabels(server, profile)
+
+	svc := buildGameService(server, profile, labels, "games.example.com")
+	assert.Equal(t, "10.0.0.99", svc.Spec.LoadBalancerIP)
+	assert.Equal(t, server.Name+".games.example.com",
+		svc.Annotations["external-dns.alpha.kubernetes.io/hostname"])
+}
+
+func TestBuildGameServiceSFTPPort(t *testing.T) {
+	server := newTestGameServer()
+	profile := newTestProfile()
+	labels := buildGameServerLabels(server, profile)
+
+	// Without the capability, no sftp port.
+	svc := buildGameService(server, profile, labels, "")
+	for _, p := range svc.Spec.Ports {
+		assert.NotEqual(t, "sftp", p.Name)
+	}
+
+	// With the capability, the sftp port is added to the same LB service.
+	profile.Spec.Capabilities = &operatorv1.CapabilitiesSpec{SFTP: true}
+	svc = buildGameService(server, profile, labels, "games.example.com")
+	var sftpPort *corev1.ServicePort
+	for i := range svc.Spec.Ports {
+		if svc.Spec.Ports[i].Name == "sftp" {
+			sftpPort = &svc.Spec.Ports[i]
+		}
+	}
+	require.NotNil(t, sftpPort, "sftp service port must be present")
+	assert.Equal(t, int32(builder.SFTPPort), sftpPort.Port)
+	assert.Equal(t, corev1.ProtocolTCP, sftpPort.Protocol)
+	// external-dns hostname annotation still applies to the shared service.
+	assert.Equal(t, server.Name+".games.example.com",
+		svc.Annotations["external-dns.alpha.kubernetes.io/hostname"])
+
+	// A profile port colliding on 2022/TCP wins; no duplicate sftp port.
+	profile.Spec.Ports = append(profile.Spec.Ports,
+		operatorv1.PortSpec{Name: "already-2022", ContainerPort: builder.SFTPPort, Protocol: corev1.ProtocolTCP})
+	svc = buildGameService(server, profile, labels, "")
+	count := 0
+	for _, p := range svc.Spec.Ports {
+		if p.Port == builder.SFTPPort {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "port 2022 must not be duplicated")
+}
+
+func TestGameServerReconciler_ResolveEndpointsSFTP(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	profile := newTestProfile()
+	profile.Spec.Capabilities = &operatorv1.CapabilitiesSpec{SFTP: true}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme, ExternalDNSZone: "games.example.com"}
+
+	endpoints := reconciler.resolveEndpoints(context.Background(), server, profile)
+	require.Len(t, endpoints, len(profile.Spec.Ports)+1)
+	sftp := endpoints[len(endpoints)-1]
+	assert.Equal(t, "sftp", sftp.Name)
+	assert.Equal(t, server.Name+".games.example.com", sftp.Address)
+	assert.Equal(t, int32(builder.SFTPPort), sftp.Port)
+
+	// Without the capability, no sftp endpoint.
+	profile.Spec.Capabilities = nil
+	endpoints = reconciler.resolveEndpoints(context.Background(), server, profile)
+	for _, e := range endpoints {
+		assert.NotEqual(t, "sftp", e.Name)
+	}
+}
+
+func TestGameServerReconciler_ResolveEndpointsDNSZone(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme, ExternalDNSZone: "games.example.com"}
+
+	endpoints := reconciler.resolveEndpoints(context.Background(), server, newTestProfile())
+	require.NotEmpty(t, endpoints)
+	assert.Equal(t, server.Name+".games.example.com", endpoints[0].Address)
 }
 
 func TestGameServerReconciler_UpdateAgentStatus(t *testing.T) {
@@ -675,3 +832,70 @@ func TestGameServerReconciler_Reconcile_ServiceMonitorCreated(t *testing.T) {
 
 // Helper to import ctrl.Request without unused import issues.
 var _ = ctrl.Request{}
+
+func TestEnsureImagePullSecrets(t *testing.T) {
+	src := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "harbor-docker-pull", Namespace: "minato"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"auths":{}}`)},
+	}
+
+	newReconciler := func(objs ...client.Object) *GameServerReconciler {
+		c := fake.NewClientBuilder().WithScheme(newTestScheme()).WithObjects(objs...).Build()
+		return &GameServerReconciler{
+			Client:            c,
+			Scheme:            newTestScheme(),
+			OperatorNamespace: "minato",
+			ImagePullSecrets:  []string{"harbor-docker-pull"},
+		}
+	}
+
+	t.Run("copies secret into target namespace", func(t *testing.T) {
+		r := newReconciler(src)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+
+		dst := &corev1.Secret{}
+		require.NoError(t, r.Get(context.Background(), types.NamespacedName{Name: "harbor-docker-pull", Namespace: "tenant-1"}, dst))
+		assert.Equal(t, src.Data, dst.Data)
+		assert.Equal(t, "minato", dst.Labels["minato.io/replicated-from"])
+	})
+
+	t.Run("leaves user-provided secret alone", func(t *testing.T) {
+		own := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "harbor-docker-pull", Namespace: "tenant-1"},
+			Data:       map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"custom":true}`)},
+		}
+		r := newReconciler(src, own)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+
+		dst := &corev1.Secret{}
+		require.NoError(t, r.Get(context.Background(), types.NamespacedName{Name: "harbor-docker-pull", Namespace: "tenant-1"}, dst))
+		assert.Equal(t, own.Data, dst.Data)
+	})
+
+	t.Run("refreshes managed copy", func(t *testing.T) {
+		stale := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "harbor-docker-pull", Namespace: "tenant-1",
+				Labels: map[string]string{"minato.io/replicated-from": "minato"},
+			},
+			Data: map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"stale":true}`)},
+		}
+		r := newReconciler(src, stale)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+
+		dst := &corev1.Secret{}
+		require.NoError(t, r.Get(context.Background(), types.NamespacedName{Name: "harbor-docker-pull", Namespace: "tenant-1"}, dst))
+		assert.Equal(t, src.Data, dst.Data)
+	})
+
+	t.Run("no-op in operator namespace", func(t *testing.T) {
+		r := newReconciler(src)
+		require.NoError(t, r.ensureImagePullSecrets(context.Background(), "minato"))
+	})
+
+	t.Run("missing source secret errors", func(t *testing.T) {
+		r := newReconciler()
+		require.Error(t, r.ensureImagePullSecrets(context.Background(), "tenant-1"))
+	})
+}

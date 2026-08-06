@@ -18,6 +18,13 @@ const (
 )
 
 func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.GameServer) (corev1.PodSpec, error) {
+	return BuildGameServerPodSpecWithPullSecrets(profile, server, nil)
+}
+
+// BuildGameServerPodSpecWithPullSecrets builds the pod spec for a GameServer,
+// attaching the given image pull secrets (by name, must exist in the
+// GameServer's namespace) to the pod.
+func BuildGameServerPodSpecWithPullSecrets(profile *operatorv1.GameProfile, server *operatorv1.GameServer, pullSecrets []string) (corev1.PodSpec, error) {
 	if profile.Spec.Storage.MountPath == "" {
 		return corev1.PodSpec{}, fmt.Errorf("storage.mountPath is required")
 	}
@@ -35,7 +42,7 @@ func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.
 		Image:        profile.Spec.Image,
 		Ports:        gamePorts,
 		Env:          gameEnv,
-		Resources:    profile.Spec.Resources,
+		Resources:    ResolveGameResources(profile, server),
 		VolumeMounts: buildDataVolumeMounts(profile),
 	}
 
@@ -49,16 +56,26 @@ func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
-		Env: []corev1.EnvVar{
-			{Name: "minato_GAMESERVER_NAME", Value: server.Name},
-			{Name: "minato_GAMESERVER_NAMESPACE", Value: server.Namespace},
-			{Name: "minato_GAME_CONTAINER", Value: GameContainerName},
-		},
+		// The agent sees the same game environment (plus its own minato_* vars) —
+		// agents typically need game config such as RCON credentials.
+		Env: append(gameEnv,
+			corev1.EnvVar{Name: "minato_GAMESERVER_NAME", Value: server.Name},
+			corev1.EnvVar{Name: "minato_GAMESERVER_NAMESPACE", Value: server.Namespace},
+			corev1.EnvVar{Name: "minato_GAME_CONTAINER", Value: GameContainerName},
+		),
 		VolumeMounts: buildDataVolumeMounts(profile),
 	}
 
 	podSpec := corev1.PodSpec{
 		Containers: []corev1.Container{gameContainer, agentContainer},
+	}
+
+	if SFTPEnabled(profile) {
+		applySFTPSidecar(&podSpec, profile, server)
+	}
+
+	for _, name := range pullSecrets {
+		podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: name})
 	}
 
 	if server.Spec.PriorityClassName != "" {
@@ -70,6 +87,14 @@ func BuildGameServerPodSpec(profile *operatorv1.GameProfile, server *operatorv1.
 	}
 
 	return podSpec, nil
+}
+
+// ResolveGameResources returns the ResourceRequirements for the game
+// container, honoring the tier selected by the GameServer. Falls back to the
+// profile's default tier, then to the flat inline resources, when the server
+// requests no tier or an unknown tier.
+func ResolveGameResources(profile *operatorv1.GameProfile, server *operatorv1.GameServer) corev1.ResourceRequirements {
+	return profile.Spec.Resources.ForTier(server.Spec.Tier)
 }
 
 func buildGameEnv(profile *operatorv1.GameProfile, server *operatorv1.GameServer) []corev1.EnvVar {

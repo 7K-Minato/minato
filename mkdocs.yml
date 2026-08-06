@@ -32,11 +32,14 @@ nav:
   - Architecture:
       - architecture/overview.md
       - architecture/controller-flow.md
+      - architecture/api-conventions.md
   - Operations:
       - operations/installation.md
       - operations/configuration.md
       - operations/cli.md
       - operations/multi-tenancy.md
+      - operations/lifecycle.md
+      - operations/sftp.md
       - operations/scalability.md
       - operations/metrics-schema.md
       - operations/security.md

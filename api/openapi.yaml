@@ -1,9 +1,13 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: Minato Control Plane API
   description: |
     REST API for managing game servers, fleets, profiles, and snapshots.
     All endpoints under `/api/v1` require authentication except where noted.
+
+    This document is the **source of truth** for the API contract
+    (see `docs/architecture/api-conventions.md`). Server routes are generated
+    from it; edit the spec first, then regenerate.
   version: 1.0.0
   contact:
     name: 7K Group
@@ -33,12 +37,15 @@ tags:
     description: Game server fleet management
   - name: Profiles
     description: Game profile management
+  - name: Console
+    description: Live console streaming
   - name: API Keys
     description: API key management
 
 paths:
   /healthz:
     get:
+      operationId: getHealthz
       tags: [Health]
       summary: Liveness probe
       description: Returns 200 OK if the control plane is running
@@ -54,6 +61,7 @@ paths:
 
   /readyz:
     get:
+      operationId: getReadyz
       tags: [Health]
       summary: Readiness probe
       description: Returns 200 OK if the control plane is ready to serve requests
@@ -69,6 +77,7 @@ paths:
 
   /auth/config:
     get:
+      operationId: getAuthConfig
       tags: [Auth]
       summary: Auth configuration discovery
       description: |
@@ -85,6 +94,7 @@ paths:
 
   /api/v1/gameservers:
     get:
+      operationId: listGameServers
       tags: [GameServers]
       summary: List game servers
       description: List all GameServers across all namespaces
@@ -99,11 +109,10 @@ paths:
                   $ref: "#/components/schemas/GameServer"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
 
   /api/v1/gameservers/{namespace}:
     post:
+      operationId: createGameServer
       tags: [GameServers]
       summary: Create game server
       description: Create a new GameServer in the specified namespace (admin only)
@@ -135,20 +144,13 @@ paths:
 
   /api/v1/gameservers/{namespace}/{name}:
     get:
+      operationId: getGameServer
       tags: [GameServers]
       summary: Get game server
       description: Get a specific GameServer by namespace and name
       parameters:
-        - name: namespace
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
       responses:
         "200":
           description: Game server details
@@ -158,21 +160,52 @@ paths:
                 $ref: "#/components/schemas/GameServer"
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateGameServerLifecycle
+      tags: [GameServers]
+      summary: Patch game server lifecycle
+      description: |
+        JSON merge-patch for lifecycle control (operator+ only). Only
+        `spec.lifecycle.autoStart` and `spec.lifecycle.idleTimeoutSeconds`
+        may be changed; any other field is rejected with 400.
+
+        Setting `autoStart: false` on a running server gracefully stops it
+        (agent PrepareShutdown, StatefulSet scaled to 0, status.state
+        becomes `Stopped`). Setting `autoStart: true` on a stopped server
+        starts it again. This is the data-plane stop used by minato-cloud
+        to suspend servers (e.g. for dunning).
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameServerLifecyclePatch"
+      responses:
+        "200":
+          description: Updated game server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
+      operationId: deleteGameServer
       tags: [GameServers]
       summary: Delete game server
       description: Delete a GameServer (admin only)
       parameters:
-        - name: namespace
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
       responses:
         "204":
           description: Game server deleted
@@ -183,22 +216,71 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /api/v1/gameservers/{namespace}/{name}/console:
+    get:
+      operationId: getConsole
+      tags: [Console]
+      summary: Console WebSocket stream
+      description: |
+        Upgrades to a WebSocket connection streaming live console output and
+        accepting console commands. The message protocol is defined in
+        `docs/agent-developers/console-protocol.md` (typed JSON frames:
+        client sends `rcon`/`ping`, server sends `log`/`rcon-response`/`status`/`error`).
+        Requires operator role or higher.
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      responses:
+        "101":
+          description: Switching Protocols — WebSocket stream established
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/gameservers/{namespace}/{name}/sftp:
+    get:
+      operationId: getSFTPInfo
+      tags: [GameServers]
+      summary: Get SFTP connection info
+      description: |
+        Returns the SFTP connection info (host, port, username, password) for
+        a game server whose GameProfile enables `capabilities.sftp`. Host and
+        port come from the server's published `sftp` status endpoint;
+        credentials come from the server-scoped Kubernetes Secret. Requires
+        operator role or higher. Returns 404 when the server does not exist,
+        the profile does not enable SFTP, or credentials/endpoints are not
+        provisioned yet.
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      responses:
+        "200":
+          description: SFTP connection info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SFTPInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/v1/gameservers/{namespace}/{name}/actions:
     get:
+      operationId: listActions
       tags: [Actions]
       summary: List available actions
       description: List actions available for a game server based on its profile
       parameters:
-        - name: namespace
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
       responses:
         "200":
           description: List of available actions
@@ -213,20 +295,13 @@ paths:
 
   /api/v1/gameservers/{namespace}/{name}/actions/{action}:
     post:
+      operationId: executeAction
       tags: [Actions]
       summary: Execute action
       description: Execute an action on a game server (operator+ only)
       parameters:
-        - name: namespace
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
         - name: action
           in: path
           required: true
@@ -247,32 +322,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  name:
-                    type: string
-                    description: Execution ID
+                $ref: "#/components/schemas/ActionExecutionRef"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
 
-  /api/v1/gameservers/{namespace}/{name}/actions/{executionId}:
+  /api/v1/gameservers/{namespace}/{name}/executions/{executionId}:
     get:
+      operationId: getActionExecution
       tags: [Actions]
       summary: Get action execution status
       description: Get the status of an action execution
       parameters:
-        - name: namespace
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
         - name: executionId
           in: path
           required: true
@@ -290,20 +354,13 @@ paths:
 
   /api/v1/gameservers/{namespace}/{name}/snapshots:
     get:
+      operationId: listSnapshots
       tags: [Snapshots]
       summary: List snapshots
       description: List snapshots for a game server
       parameters:
-        - name: namespace
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
       responses:
         "200":
           description: List of snapshots
@@ -314,20 +371,13 @@ paths:
                 items:
                   $ref: "#/components/schemas/GameSnapshot"
     post:
+      operationId: createSnapshot
       tags: [Snapshots]
       summary: Create snapshot
       description: Create a snapshot for a game server (operator+ only)
       parameters:
-        - name: namespace
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
       responses:
         "201":
           description: Snapshot created
@@ -342,6 +392,7 @@ paths:
 
   /api/v1/gameserverfleets:
     get:
+      operationId: listGameServerFleets
       tags: [Fleets]
       summary: List fleets
       description: List all GameServerFleets across all namespaces
@@ -357,22 +408,50 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /api/v1/gameserverfleets/{namespace}/{name}:
-    get:
+  /api/v1/gameserverfleets/{namespace}:
+    post:
+      operationId: createGameServerFleet
       tags: [Fleets]
-      summary: Get fleet
-      description: Get a specific GameServerFleet
+      summary: Create fleet
+      description: |
+        Create a new GameServerFleet in the specified namespace (admin only).
+        The target namespace is auto-created (and hardened) if it does not
+        exist. The referenced GameProfile must exist and replicas must be >= 0.
       parameters:
         - name: namespace
           in: path
           required: true
           schema:
             type: string
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameServerFleet"
+      responses:
+        "201":
+          description: Fleet created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServerFleet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/gameserverfleets/{namespace}/{name}:
+    get:
+      operationId: getGameServerFleet
+      tags: [Fleets]
+      summary: Get fleet
+      description: Get a specific GameServerFleet
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
       responses:
         "200":
           description: Fleet details
@@ -382,9 +461,59 @@ paths:
                 $ref: "#/components/schemas/GameServerFleet"
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateGameServerFleet
+      tags: [Fleets]
+      summary: Scale fleet
+      description: |
+        JSON merge-patch for fleet scaling (operator+ only). Only
+        `spec.replicas` may be changed; any other field is rejected with 400.
+        replicas must be >= 0.
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameServerFleetPatch"
+      responses:
+        "200":
+          description: Updated fleet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameServerFleet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteGameServerFleet
+      tags: [Fleets]
+      summary: Delete fleet
+      description: Delete a GameServerFleet and its GameServers (admin only)
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      responses:
+        "204":
+          description: Fleet deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/profiles:
     get:
+      operationId: listProfiles
       tags: [Profiles]
       summary: List profiles
       description: List all GameProfiles (cluster-scoped)
@@ -402,6 +531,7 @@ paths:
 
   /api/v1/profiles/{name}:
     get:
+      operationId: getProfile
       tags: [Profiles]
       summary: Get profile
       description: Get a specific GameProfile
@@ -423,6 +553,7 @@ paths:
 
   /api/v1/apikeys:
     get:
+      operationId: listAPIKeys
       tags: [API Keys]
       summary: List API keys
       description: List all API keys without secret values (admin only)
@@ -440,6 +571,7 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
     post:
+      operationId: createAPIKey
       tags: [API Keys]
       summary: Create API key
       description: Generate a new API key (admin only)
@@ -448,35 +580,16 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: Key name
-                role:
-                  type: string
-                  enum: [viewer, operator, admin]
-                  description: Role for the key
+                $ref: "#/components/schemas/CreateAPIKeyRequest"
       responses:
         "201":
           description: API key created (key value shown once)
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  name:
-                    type: string
-                  role:
-                    type: string
-                  createdAt:
-                    type: string
-                    format: date-time
-                  key:
-                    type: string
-                    description: The API key value (shown once)
-                  warning:
-                    type: string
+                $ref: "#/components/schemas/APIKeyCreated"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -484,6 +597,7 @@ paths:
 
   /api/v1/apikeys/{keyId}:
     delete:
+      operationId: deleteAPIKey
       tags: [API Keys]
       summary: Revoke API key
       description: Delete/revoke an API key (admin only)
@@ -504,20 +618,36 @@ paths:
           $ref: "#/components/responses/NotFound"
 
 components:
+  parameters:
+    Namespace:
+      name: namespace
+      in: path
+      required: true
+      schema:
+        type: string
+    Name:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      description: OIDC JWT token
+      description: |
+        OIDC JWT token for humans, or a minato API key (`minato_...`) for
+        machine callers. `X-API-Key` is accepted as a legacy alias for API keys.
     basicAuth:
       type: http
       scheme: basic
-      description: Basic authentication
+      description: Basic authentication (local development only)
     apiKeyAuth:
       type: apiKey
       in: header
       name: X-API-Key
-      description: API key authentication
+      description: "Legacy alias for API key authentication; prefer `Authorization: Bearer`"
 
   schemas:
     AuthConfig:
@@ -553,19 +683,26 @@ components:
           type: string
           example: GameServer
         metadata:
-          type: object
-          properties:
-            name:
-              type: string
-            namespace:
-              type: string
-            creationTimestamp:
-              type: string
-              format: date-time
+          $ref: "#/components/schemas/ObjectMeta"
         spec:
           $ref: "#/components/schemas/GameServerSpec"
         status:
           $ref: "#/components/schemas/GameServerStatus"
+
+    ObjectMeta:
+      type: object
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        creationTimestamp:
+          type: string
+          format: date-time
 
     GameServerSpec:
       type: object
@@ -573,6 +710,10 @@ components:
         profile:
           type: string
           description: Reference to GameProfile name
+        tier:
+          type: string
+          maxLength: 32
+          description: Resource tier from the GameProfile's spec.resources.tiers
         env:
           type: object
           additionalProperties:
@@ -582,11 +723,16 @@ components:
           $ref: "#/components/schemas/StorageSpec"
         priorityClassName:
           type: string
+        loadBalancerIP:
+          type: string
+          description: Pin a specific external IP for the game server's LoadBalancer service
         lifecycle:
           type: object
           properties:
             idleTimeoutSeconds:
               type: integer
+            autoStart:
+              type: boolean
 
     GameServerStatus:
       type: object
@@ -620,6 +766,21 @@ components:
           type: string
         port:
           type: integer
+
+    SFTPInfo:
+      type: object
+      properties:
+        host:
+          type: string
+          description: External hostname or IP of the game server
+        port:
+          type: integer
+          description: SFTP port on the player-facing LoadBalancer service
+        username:
+          type: string
+        password:
+          type: string
+      required: [host, port, username, password]
 
     StorageSpec:
       type: object
@@ -667,6 +828,14 @@ components:
         default:
           type: string
 
+    ActionExecutionRef:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Execution ID
+      required: [name]
+
     ActionExecution:
       type: object
       properties:
@@ -676,15 +845,7 @@ components:
           type: string
           example: ActionExecution
         metadata:
-          type: object
-          properties:
-            name:
-              type: string
-            namespace:
-              type: string
-            creationTimestamp:
-              type: string
-              format: date-time
+          $ref: "#/components/schemas/ObjectMeta"
         spec:
           type: object
           properties:
@@ -733,15 +894,7 @@ components:
           type: string
           example: GameSnapshot
         metadata:
-          type: object
-          properties:
-            name:
-              type: string
-            namespace:
-              type: string
-            creationTimestamp:
-              type: string
-              format: date-time
+          $ref: "#/components/schemas/ObjectMeta"
         spec:
           type: object
           properties:
@@ -779,15 +932,7 @@ components:
           type: string
           example: GameServerFleet
         metadata:
-          type: object
-          properties:
-            name:
-              type: string
-            namespace:
-              type: string
-            creationTimestamp:
-              type: string
-              format: date-time
+          $ref: "#/components/schemas/ObjectMeta"
         spec:
           type: object
           properties:
@@ -842,10 +987,7 @@ components:
           type: string
           example: GameProfile
         metadata:
-          type: object
-          properties:
-            name:
-              type: string
+          $ref: "#/components/schemas/ObjectMeta"
         spec:
           $ref: "#/components/schemas/GameProfileSpec"
 
@@ -854,6 +996,18 @@ components:
       properties:
         displayName:
           type: string
+        category:
+          type: string
+          maxLength: 32
+          description: Storefront category (e.g. sandbox, fps, survival, mmo)
+        icon:
+          type: string
+          maxLength: 512
+          description: URL to an icon image for storefront display
+        description:
+          type: string
+          maxLength: 4096
+          description: Markdown blurb describing the game for storefronts
         image:
           type: string
           description: Game server container image
@@ -882,6 +1036,15 @@ components:
                   type: string
                 memory:
                   type: string
+            tiers:
+              type: object
+              description: Named resource presets selectable via GameServer spec.tier
+              additionalProperties:
+                $ref: "#/components/schemas/ResourceRequirements"
+            default:
+              type: string
+              maxLength: 32
+              description: Name of the tier applied when a GameServer does not specify one
         storage:
           type: object
           properties:
@@ -912,6 +1075,41 @@ components:
               type: boolean
             restoreFromSnapshot:
               type: boolean
+        observability:
+          type: object
+          properties:
+            agentMetrics:
+              type: object
+              properties:
+                port:
+                  type: integer
+                path:
+                  type: string
+            serviceMonitor:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                interval:
+                  type: string
+
+    ResourceRequirements:
+      type: object
+      properties:
+        requests:
+          type: object
+          properties:
+            cpu:
+              type: string
+            memory:
+              type: string
+        limits:
+          type: object
+          properties:
+            cpu:
+              type: string
+            memory:
+              type: string
 
     Port:
       type: object
@@ -924,6 +1122,10 @@ components:
           type: string
           enum: [TCP, UDP]
           default: TCP
+        exposed:
+          type: boolean
+          default: true
+          description: Whether this port is published on the external LoadBalancer service
 
     EnvVar:
       type: object
@@ -934,6 +1136,8 @@ components:
           type: string
         required:
           type: boolean
+        description:
+          type: string
 
     APIKey:
       type: object
@@ -948,14 +1152,114 @@ components:
           format: date-time
         createdBy:
           type: string
+        namespaces:
+          type: array
+          items:
+            type: string
+          description: Namespace patterns the key is restricted to (empty = cluster-wide)
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional expiry time; expired keys are rejected with 401
+
+    CreateAPIKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Key name
+        role:
+          type: string
+          enum: [viewer, operator, admin]
+          description: Role for the key (defaults to the caller's role)
+        namespaces:
+          type: array
+          items:
+            type: string
+          description: >-
+            Optional namespace patterns (exact names or trailing-"*" globs such
+            as "tenant-*") restricting the key. Omit for a cluster-wide key.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional expiry time (must be in the future)
+      required: [name]
+
+    APIKeyCreated:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        namespaces:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        key:
+          type: string
+          description: The API key value (shown once)
+        warning:
+          type: string
+      required: [name, role, key]
 
     Error:
       type: object
       properties:
         error:
           type: string
-        message:
-          type: string
+      required: [error]
+
+    GameServerLifecycle:
+      type: object
+      additionalProperties: false
+      properties:
+        autoStart:
+          type: boolean
+          description: >-
+            Whether the server should be running. false gracefully stops a
+            running server (agent PrepareShutdown, scale to 0, state Stopped);
+            true starts a stopped server again.
+        idleTimeoutSeconds:
+          type: integer
+          minimum: 0
+          description: Seconds of player-idle time before auto-shutdown (0 = never)
+
+    GameServerLifecyclePatch:
+      type: object
+      additionalProperties: false
+      description: >-
+        Strict merge-patch for GameServer lifecycle control. Only
+        spec.lifecycle.autoStart / spec.lifecycle.idleTimeoutSeconds are
+        accepted; unknown fields are rejected with 400.
+      properties:
+        spec:
+          type: object
+          additionalProperties: false
+          properties:
+            lifecycle:
+              $ref: "#/components/schemas/GameServerLifecycle"
+
+    GameServerFleetPatch:
+      type: object
+      additionalProperties: false
+      description: >-
+        Strict merge-patch for fleet scaling. Only spec.replicas is accepted;
+        unknown fields are rejected with 400.
+      properties:
+        spec:
+          type: object
+          additionalProperties: false
+          properties:
+            replicas:
+              type: integer
+              minimum: 0
 
   responses:
     BadRequest:

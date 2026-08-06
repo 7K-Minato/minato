@@ -54,7 +54,7 @@ helm-crds: ## Copy CRDs into the Helm chart.
 	cp config/crd/bases/*.yaml chart/files/crds/
 
 .PHONY: generate
-generate: controller-gen buf-generate ## Generate DeepCopy methods and protobuf code.
+generate: controller-gen buf-generate oapi-generate ## Generate DeepCopy methods, protobuf code, and OpenAPI server code.
 	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt",year=$(YEAR) paths="./..."
 
 .PHONY: fmt
@@ -135,11 +135,13 @@ build-all: ## Build all binaries for current platform.
 docker-build-all: ## Build all Docker images.
 	$(CONTAINER_TOOL) build -t $(IMG) .
 	$(CONTAINER_TOOL) build -t $(IMG)-controlplane -f Dockerfile.controlplane .
+	$(CONTAINER_TOOL) build -t $(IMG)-registrar -f Dockerfile.registrar .
 
 .PHONY: docker-push-all
 docker-push-all: ## Push all Docker images.
 	$(CONTAINER_TOOL) push $(IMG)
 	$(CONTAINER_TOOL) push $(IMG)-controlplane
+	$(CONTAINER_TOOL) push $(IMG)-registrar
 
 .PHONY: helm-lint
 helm-lint: ## Lint the Helm chart.
@@ -227,10 +229,12 @@ KIND ?= kind
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+OAPI_CODEGEN ?= $(LOCALBIN)/oapi-codegen
 BUF ?= buf
 
 ## Tool Versions
 CONTROLLER_TOOLS_VERSION ?= v0.20.1
+OAPI_CODEGEN_VERSION ?= v2.4.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -260,6 +264,15 @@ buf-generate: ## Generate Go code from protobufs.
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
+
+.PHONY: oapi-generate
+oapi-generate: $(OAPI_CODEGEN) ## Generate chi server interface from api/openapi.yaml.
+	"$(OAPI_CODEGEN)" -config internal/controlplane/oapi/oapi-codegen.yaml api/openapi.yaml
+	"$(OAPI_CODEGEN)" -config sdk/controlplane/gen/oapi-codegen.yaml api/openapi.yaml
+	"$(OAPI_CODEGEN)" -config internal/cloudapi/oapi-codegen.yaml api/minato-cloud.openapi.yaml
+
+$(OAPI_CODEGEN): $(LOCALBIN)
+	$(call go-install-tool,$(OAPI_CODEGEN),github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen,$(OAPI_CODEGEN_VERSION))
 
 .PHONY: setup-envtest
 setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.

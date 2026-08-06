@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -337,4 +339,135 @@ func TestGameServerFleetReconciler_HandleRollingUpdate(t *testing.T) {
 	// The fake client has limitations with object updates in complex scenarios.
 	// This functionality is covered by the controller logic itself.
 	t.Skip("Rolling update tested via integration tests")
+}
+
+func runningFleetServer(name, ns string) *operatorv1.GameServer {
+	return &operatorv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+		Status:     operatorv1.GameServerStatus{State: "Running", AgentVersion: "v1.0.0"},
+	}
+}
+
+func TestGameServerFleetReconciler_DrainServer_CallsAgentPrepareShutdown(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+
+	agent := &fakeAgent{}
+	stubAgentDial(t, agent)
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &GameServerFleetReconciler{Client: cl, Scheme: scheme}
+
+	fleet := &operatorv1.GameServerFleet{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet", Namespace: "default"},
+		Spec: operatorv1.GameServerFleetSpec{
+			Profile:  "mc",
+			Replicas: 1,
+			UpdateStrategy: operatorv1.FleetUpdateStrategy{
+				Type: "RollingUpdate",
+				RollingUpdate: &operatorv1.RollingUpdateSpec{
+					DrainTimeoutSeconds: 45,
+				},
+			},
+		},
+	}
+
+	r.drainServer(context.Background(), fleet, runningFleetServer("fleet-0", "default"))
+
+	assert.Equal(t, int32(1), agent.shutdownCalls.Load())
+	req := agent.lastShutdown.Load()
+	require.NotNil(t, req)
+	assert.Equal(t, int32(45), req.TimeoutSeconds)
+	assert.Equal(t, "fleet scale-down", req.DrainReason)
+}
+
+func TestGameServerFleetReconciler_DrainServer_DefaultTimeout(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+
+	agent := &fakeAgent{}
+	stubAgentDial(t, agent)
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &GameServerFleetReconciler{Client: cl, Scheme: scheme}
+
+	fleet := &operatorv1.GameServerFleet{ObjectMeta: metav1.ObjectMeta{Name: "fleet", Namespace: "default"}}
+
+	r.drainServer(context.Background(), fleet, runningFleetServer("fleet-0", "default"))
+
+	assert.Equal(t, int32(1), agent.shutdownCalls.Load())
+	req := agent.lastShutdown.Load()
+	require.NotNil(t, req)
+	assert.Equal(t, int32(defaultDrainTimeoutSeconds), req.TimeoutSeconds)
+}
+
+func TestGameServerFleetReconciler_DrainServer_SkipsNonRunning(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+
+	agent := &fakeAgent{}
+	stubAgentDial(t, agent)
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &GameServerFleetReconciler{Client: cl, Scheme: scheme}
+
+	cases := []operatorv1.GameServerStatus{
+		{State: "Provisioning", AgentVersion: "v1"},
+		{State: "Running", AgentVersion: ""}, // agent not yet identified
+		{State: "Stopped", AgentVersion: "v1"},
+	}
+	for _, status := range cases {
+		server := &operatorv1.GameServer{
+			ObjectMeta: metav1.ObjectMeta{Name: "fleet-0", Namespace: "default"},
+			Status:     status,
+		}
+		r.drainServer(context.Background(), nil, server)
+	}
+	assert.Equal(t, int32(0), agent.shutdownCalls.Load())
+}
+
+func TestGameServerFleetReconciler_DrainServer_TimeoutProceeds(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+
+	// Agent hangs longer than the drain timeout.
+	agent := &fakeAgent{shutdownDelay: 5 * time.Second}
+	stubAgentDial(t, agent)
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &GameServerFleetReconciler{Client: cl, Scheme: scheme}
+
+	fleet := &operatorv1.GameServerFleet{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet", Namespace: "default"},
+		Spec: operatorv1.GameServerFleetSpec{
+			UpdateStrategy: operatorv1.FleetUpdateStrategy{
+				RollingUpdate: &operatorv1.RollingUpdateSpec{DrainTimeoutSeconds: 1},
+			},
+		},
+	}
+
+	start := time.Now()
+	r.drainServer(context.Background(), fleet, runningFleetServer("fleet-0", "default"))
+	elapsed := time.Since(start)
+
+	// Drain must give up at ~1s, not wait for the 5s agent.
+	assert.Less(t, elapsed, 4*time.Second)
+	assert.Equal(t, int32(1), agent.shutdownCalls.Load())
+}
+
+func TestGameServerFleetReconciler_DrainServer_DialFailureProceeds(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = operatorv1.AddToScheme(scheme)
+
+	old := dialAgent
+	dialAgent = func(_ *operatorv1.GameServer) (*grpc.ClientConn, error) {
+		return nil, context.DeadlineExceeded
+	}
+	t.Cleanup(func() { dialAgent = old })
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &GameServerFleetReconciler{Client: cl, Scheme: scheme}
+
+	// Must not panic or block; deletion proceeds after this returns.
+	r.drainServer(context.Background(), nil, runningFleetServer("fleet-0", "default"))
 }

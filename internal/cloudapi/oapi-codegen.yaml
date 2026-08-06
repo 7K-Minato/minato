@@ -1,0 +1,12 @@
+# oapi-codegen configuration for the minato-cloud (SaaS) API client used by
+# `minato-ctl cloud`. Source of truth: ../../api/minato-cloud.openapi.yaml
+# (a snapshot of minato-cloud/api/openapi.yaml from the sibling repo —
+# do not import minato-cloud as a Go module).
+package: gen
+output: internal/cloudapi/gen/client.gen.go
+generate:
+  client: true
+  models: true
+output-options:
+  skip-fmt: false
+  skip-prune: false

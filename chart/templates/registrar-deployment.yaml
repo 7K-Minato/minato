@@ -1,0 +1,73 @@
+{{- if .Values.registrar.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "minato.fullname" . }}-registrar
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    app.kubernetes.io/component: registrar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "minato.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: registrar
+  template:
+    metadata:
+      labels:
+        {{- include "minato.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: registrar
+    spec:
+      serviceAccountName: {{ include "minato.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: registrar
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.registrar.image.repository }}:{{ .Values.registrar.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.registrar.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: CLOUD_URL
+              value: {{ required "registrar.cloudUrl is required when registrar.enabled" .Values.registrar.cloudUrl | quote }}
+            - name: CLUSTER_NAME
+              value: {{ required "registrar.clusterName is required when registrar.enabled" .Values.registrar.clusterName | quote }}
+            - name: CLUSTER_REGION
+              value: {{ .Values.registrar.region | quote }}
+            - name: CAPACITY_MAX
+              value: {{ .Values.registrar.capacityMax | quote }}
+            - name: HEARTBEAT_INTERVAL
+              value: {{ .Values.registrar.heartbeatInterval | quote }}
+            - name: CONTROLPLANE_URL
+              value: {{ .Values.registrar.controlplaneUrl | default (printf "http://%s-controlplane:%v" (include "minato.fullname" .) .Values.controlPlane.service.port) | quote }}
+            - name: DEDICATED_TENANT_ID
+              value: {{ .Values.registrar.dedicatedTenantId | quote }}
+            {{- if .Values.registrar.clusterFingerprint }}
+            - name: CLUSTER_FINGERPRINT
+              value: {{ .Values.registrar.clusterFingerprint | quote }}
+            {{- end }}
+            - name: REGISTER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registrar.registerTokenSecret.name }}
+                  key: {{ .Values.registrar.registerTokenSecret.key }}
+            - name: CONTROLPLANE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registrar.controlplaneKeySecret.name }}
+                  key: {{ .Values.registrar.controlplaneKeySecret.key }}
+          resources:
+            {{- toYaml .Values.registrar.resources | nindent 12 }}
+{{- end }}

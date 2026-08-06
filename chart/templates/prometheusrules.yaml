@@ -51,5 +51,5 @@ spec:
         severity: warning
       annotations:
         summary: "Action execution failing"
-        description: "Action {{ "{{" }} $labels.action {{ "}}" }} is failing on profile {{ "{{" }} $labels.profile {{ "}}" }}."
+        description: "Action {{ "{{" }} $labels.action {{ "}}" }} is failing (see ActionExecution objects for details)."
 {{- end }}

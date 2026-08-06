@@ -117,6 +117,18 @@ spec:
                     description: sftp enables the sftp sidecar.
                     type: boolean
                 type: object
+              category:
+                description: |-
+                  category groups profiles for storefront browsing (e.g. sandbox, fps,
+                  survival, mmo).
+                maxLength: 32
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
+              description:
+                description: description is a markdown blurb describing the game for
+                  storefronts.
+                maxLength: 4096
+                type: string
               displayName:
                 description: displayName is a human-friendly name for the profile.
                 type: string
@@ -129,6 +141,10 @@ spec:
                     default:
                       description: default is the default value if not provided.
                       type: string
+                    description:
+                      description: description explains what this env var controls,
+                        shown to users.
+                      type: string
                     key:
                       description: key is the environment variable name.
                       type: string
@@ -140,6 +156,10 @@ spec:
                   - key
                   type: object
                 type: array
+              icon:
+                description: icon is a URL to an icon image for storefront display.
+                maxLength: 512
+                type: string
               image:
                 description: image is the game container image.
                 type: string
@@ -147,6 +167,33 @@ spec:
                 description: imagePullPolicy is the pull policy for the game container
                   image.
                 type: string
+              observability:
+                description: observability defines metrics and monitoring configuration.
+                properties:
+                  agentMetrics:
+                    description: agentMetrics configures the agent's metrics endpoint.
+                    properties:
+                      path:
+                        description: path is the agent metrics path.
+                        type: string
+                      port:
+                        description: port is the agent metrics port.
+                        format: int32
+                        type: integer
+                    type: object
+                  serviceMonitor:
+                    description: serviceMonitor configures ServiceMonitor creation
+                      for game servers.
+                    properties:
+                      enabled:
+                        description: enabled controls whether a ServiceMonitor is
+                          created for the game server.
+                        type: boolean
+                      interval:
+                        description: interval is the scrape interval.
+                        type: string
+                    type: object
+                type: object
               ports:
                 description: ports defines the game ports.
                 items:
@@ -156,6 +203,12 @@ spec:
                       description: containerPort is the port exposed by the container.
                       format: int32
                       type: integer
+                    exposed:
+                      description: |-
+                        exposed controls whether this port is published on the external
+                        (LoadBalancer) game service. Internal ports like RCON should set this
+                        to false. Defaults to true.
+                      type: boolean
                     name:
                       description: name is a friendly port name.
                       type: string
@@ -168,7 +221,8 @@ spec:
                   type: object
                 type: array
               resources:
-                description: resources defines default container resources.
+                description: resources defines default container resources and optional
+                  named tiers.
                 properties:
                   claims:
                     description: |-
@@ -201,6 +255,13 @@ spec:
                     x-kubernetes-list-map-keys:
                     - name
                     x-kubernetes-list-type: map
+                  default:
+                    description: |-
+                      default names the tier applied when a GameServer does not specify one.
+                      Required when tiers is non-empty; must reference an existing tier.
+                    maxLength: 32
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
                   limits:
                     additionalProperties:
                       anyOf:
@@ -225,6 +286,71 @@ spec:
                       otherwise to an implementation-defined value. Requests cannot exceed Limits.
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
+                  tiers:
+                    additionalProperties:
+                      description: ResourceRequirements describes the compute resource
+                        requirements.
+                      properties:
+                        claims:
+                          description: |-
+                            Claims lists the names of resources, defined in spec.resourceClaims,
+                            that are used by this container.
+
+                            This field depends on the
+                            DynamicResourceAllocation feature gate.
+
+                            This field is immutable. It can only be set for containers.
+                          items:
+                            description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                            properties:
+                              name:
+                                description: |-
+                                  Name must match the name of one entry in pod.spec.resourceClaims of
+                                  the Pod where this field is used. It makes that resource available
+                                  inside a container.
+                                type: string
+                              request:
+                                description: |-
+                                  Request is the name chosen for a request in the referenced claim.
+                                  If empty, everything from the claim is made available, otherwise
+                                  only the result of this request.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        limits:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Limits describes the maximum amount of compute resources allowed.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                          type: object
+                        requests:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Requests describes the minimum amount of compute resources required.
+                            If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                            otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                          type: object
+                      type: object
+                    description: |-
+                      tiers defines named resource presets (e.g. small, medium, large) that a
+                      GameServer can select via spec.tier.
+                    type: object
                 type: object
               storage:
                 description: storage defines the default persistent storage settings.
@@ -234,6 +360,12 @@ spec:
                     type: string
                   sizeDefault:
                     description: sizeDefault is the default PVC size.
+                    type: string
+                  sizeMax:
+                    description: sizeMax is the maximum allowed PVC size (e.g. "200Gi").
+                    type: string
+                  sizeMin:
+                    description: sizeMin is the minimum allowed PVC size (e.g. "10Gi").
                     type: string
                 required:
                 - mountPath

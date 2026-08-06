@@ -27,11 +27,29 @@ type User struct {
 	Email    string `json:"email,omitempty"`
 	Role     string `json:"role"`
 	Source   string `json:"source"` // basic, oidc, apikey
+	// Namespaces restricts which namespaces this user may access. Empty means
+	// cluster-wide (the default for basic/OIDC users and admin API keys).
+	// Entries are exact namespace names or trailing-"*" prefix globs.
+	Namespaces []string `json:"namespaces,omitempty"`
 }
 
 // IsAnonymous returns true if the user is not authenticated.
 func (u *User) IsAnonymous() bool {
 	return u == nil || u.ID == ""
+}
+
+// ClusterWide returns true if the user is not restricted to a set of
+// namespaces.
+func (u *User) ClusterWide() bool {
+	return u == nil || len(u.Namespaces) == 0
+}
+
+// AllowsNamespace reports whether the user may access the given namespace.
+func (u *User) AllowsNamespace(ns string) bool {
+	if u.ClusterWide() {
+		return true
+	}
+	return MatchAnyNamespace(u.Namespaces, ns)
 }
 
 type contextKey struct{}

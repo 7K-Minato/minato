@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the published control plane client (sdk-go).
+# Source of truth: ../../../api/openapi.yaml
+package: gen
+output: sdk/controlplane/gen/client.go
+generate:
+  client: true
+  models: true
+output-options:
+  skip-fmt: false
+  skip-prune: false

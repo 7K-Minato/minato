@@ -1,0 +1,67 @@
+{{- if .Values.rbac.create }}
+# Tenant-facing ClusterRoles for human access via kubectl.
+# Bind per tenant namespace with RoleBindings; not used by the control plane.
+# See docs/operations/multi-tenancy.md.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: minato:tenant-viewer
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    minato.io/aggregate-to-tenant-operator: "true"
+rules:
+  - apiGroups: ["operator.minato.io"]
+    resources: ["gameservers", "gameserverfleets", "actionexecutions", "gamesnapshots", "gameprofiles"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: minato:tenant-operator
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    minato.io/aggregate-to-tenant-admin: "true"
+aggregationRule:
+  clusterRoleSelectors:
+    - matchLabels:
+        minato.io/aggregate-to-tenant-operator: "true"
+rules:
+  - apiGroups: ["operator.minato.io"]
+    resources: ["gameservers", "actionexecutions"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: minato:tenant-admin
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+aggregationRule:
+  clusterRoleSelectors:
+    - matchLabels:
+        minato.io/aggregate-to-tenant-admin: "true"
+rules:
+  - apiGroups: ["operator.minato.io"]
+    resources: ["gameserverfleets", "gamesnapshots"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: minato:platform-admin
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["operator.minato.io"]
+    resources: ["gameprofiles"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+{{- end }}

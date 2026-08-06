@@ -23,6 +23,7 @@ spec:
         {{- include "minato.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: controlplane
     spec:
+      serviceAccountName: {{ include "minato.serviceAccountName" . }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -59,8 +60,12 @@ spec:
             timeoutSeconds: 1
           resources:
             {{- toYaml .Values.controlPlane.resources | nindent 12 }}
-          {{- with .Values.controlPlane.env }}
           env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          {{- with .Values.controlPlane.env }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with .Values.controlPlane.envFrom }}

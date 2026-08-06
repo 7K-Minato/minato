@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,12 +19,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/internal/controlplane/oapi"
 )
 
 func setupTestAPI(objs ...client.Object) (*controlPlaneAPI, client.Client) {
 	scheme := runtime.NewScheme()
 	_ = operatorv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
+	_ = networkingv1.AddToScheme(scheme)
 
 	builder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...)
 
@@ -44,38 +47,7 @@ func setupTestAPI(objs ...client.Object) (*controlPlaneAPI, client.Client) {
 
 func newRouter(api *controlPlaneAPI) *chi.Mux {
 	r := chi.NewRouter()
-
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/gameservers", api.listGameServers)
-		r.Get("/gameservers/{namespace}/{name}", api.getGameServer)
-		r.Post("/gameservers/{namespace}", api.createGameServer)
-		r.Delete("/gameservers/{namespace}/{name}", api.deleteGameServer)
-
-		r.Get("/gameservers/{namespace}/{name}/actions", api.listActions)
-		r.Post("/gameservers/{namespace}/{name}/actions/{action}", api.executeAction)
-		r.Get("/gameservers/{namespace}/{name}/actions/{executionId}", api.getActionExecution)
-
-		r.Get("/gameservers/{namespace}/{name}/snapshots", api.listSnapshots)
-		r.Post("/gameservers/{namespace}/{name}/snapshots", api.createSnapshot)
-
-		r.Get("/gameservers/{namespace}/{name}/console", api.handleConsole)
-
-		r.Get("/gameserverfleets", api.listGameServerFleets)
-		r.Get("/gameserverfleets/{namespace}/{name}", api.getGameServerFleet)
-
-		r.Get("/profiles", api.listProfiles)
-		r.Get("/profiles/{name}", api.getProfile)
-	})
-
+	oapi.HandlerFromMux(api, r)
 	return r
 }
 
@@ -83,7 +55,7 @@ func newRouter(api *controlPlaneAPI) *chi.Mux {
 func TestRespondJSON(t *testing.T) {
 	rec := httptest.NewRecorder()
 	data := map[string]string{"key": "value"}
-	respondJSON(rec, data)
+	respondJSON(rec, http.StatusOK, data)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
@@ -286,6 +258,73 @@ func TestCreateGameServer_InternalError(t *testing.T) {
 }
 
 // deleteGameServer
+func TestCreateGameServer_CreatesNamespace(t *testing.T) {
+	api, c := setupTestAPI()
+	r := newRouter(api)
+
+	gs := operatorv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "gs-new"},
+		Spec:       operatorv1.GameServerSpec{Profile: "minecraft"},
+	}
+	body, _ := json.Marshal(gs)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/gameservers/tenant-new", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var ns corev1.Namespace
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "tenant-new"}, &ns); err != nil {
+		t.Fatalf("expected namespace to be auto-created: %v", err)
+	}
+}
+
+func TestCreateGameServer_HardensNewNamespace(t *testing.T) {
+	api, c := setupTestAPI()
+	r := newRouter(api)
+
+	gs := operatorv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "gs-new"},
+		Spec:       operatorv1.GameServerSpec{Profile: "minecraft"},
+	}
+	body, _ := json.Marshal(gs)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/gameservers/tenant-hardened", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var ns corev1.Namespace
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "tenant-hardened"}, &ns); err != nil {
+		t.Fatalf("expected namespace: %v", err)
+	}
+	if ns.Labels["minato.io/tenant"] != "tenant-hardened" {
+		t.Fatalf("missing tenant label: %v", ns.Labels)
+	}
+	if ns.Labels["pod-security.kubernetes.io/enforce"] != "restricted" {
+		t.Fatalf("missing PSS labels: %v", ns.Labels)
+	}
+
+	var quota corev1.ResourceQuota
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "minato-tenant-quota", Namespace: "tenant-hardened"}, &quota); err != nil {
+		t.Fatalf("expected default resource quota: %v", err)
+	}
+
+	var np networkingv1.NetworkPolicy
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "minato-tenant-default", Namespace: "tenant-hardened"}, &np); err != nil {
+		t.Fatalf("expected default network policy: %v", err)
+	}
+}
+
+// deleteGameServer
 func TestDeleteGameServer_Success(t *testing.T) {
 	gs := &operatorv1.GameServer{
 		ObjectMeta: metav1.ObjectMeta{Name: "gs1", Namespace: "default"},
@@ -467,11 +506,9 @@ func TestExecuteAction_InternalError(t *testing.T) {
 }
 
 // getActionExecution
-// NOTE: getActionExecution uses chi.URLParam(r, "name") which resolves to the GameServer name,
-// not the executionId. This matches the current source code behavior.
 func TestGetActionExecution_Success(t *testing.T) {
 	exec := &operatorv1.ActionExecution{
-		ObjectMeta: metav1.ObjectMeta{Name: "gs1", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "exec1", Namespace: "default"},
 		Spec: operatorv1.ActionExecutionSpec{
 			ActionName: "restart",
 			TargetRef:  operatorv1.TargetRef{Name: "gs1", Namespace: "default", Kind: "GameServer", APIVersion: "operator.minato.io/v1"},
@@ -481,7 +518,7 @@ func TestGetActionExecution_Success(t *testing.T) {
 	r := newRouter(api)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/gameservers/default/gs1/actions/exec1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/gameservers/default/gs1/executions/exec1", nil)
 	r.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -501,7 +538,7 @@ func TestGetActionExecution_NotFound(t *testing.T) {
 	r := newRouter(api)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/gameservers/default/gs1/actions/missing", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/gameservers/default/gs1/executions/missing", nil)
 	r.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {

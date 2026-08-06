@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +37,7 @@ const (
 	stateProvisioning      = "Provisioning"
 	stateRunning           = "Running"
 	stateIdle              = "Idle"
+	stateStopped           = "Stopped"
 	stateError             = "Error"
 
 	// gRPC timeouts for agent communication
@@ -46,6 +48,22 @@ const (
 type GameServerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	// OperatorNamespace is where the operator runs; image pull secrets are
+	// copied from here into GameServer namespaces.
+	OperatorNamespace string
+	// ImagePullSecrets are secret names to attach to game server pods. Each
+	// must exist in OperatorNamespace; the reconciler replicates them into
+	// the GameServer's namespace.
+	ImagePullSecrets []string
+	// ExternalDNSZone, when set, annotates game LoadBalancer services with an
+	// external-dns hostname (<server>.<zone>) and publishes that hostname in
+	// status.endpoints instead of the raw IP.
+	ExternalDNSZone string
+	// Recorder emits Kubernetes events (e.g. when ServiceMonitor creation is
+	// skipped because the Prometheus Operator is not installed). May be nil
+	// in tests.
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch;create;update;patch;delete
@@ -54,6 +72,7 @@ type GameServerReconciler struct {
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameprofiles,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is the main entrypoint for the GameServer controller.
@@ -108,7 +127,11 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	podSpec, err := builder.BuildGameServerPodSpec(profile, server)
+	if err := r.ensureImagePullSecrets(ctx, server.Namespace); err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensure image pull secrets: %w", err)
+	}
+
+	podSpec, err := builder.BuildGameServerPodSpecWithPullSecrets(profile, server, r.ImagePullSecrets)
 	if err != nil {
 		r.setProfileMissingCondition(ctx, server, err)
 		return ctrl.Result{}, err
@@ -116,8 +139,38 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	labelsMap := buildGameServerLabels(server, profile)
 
+	// SFTP credentials must exist before the pod starts: the sidecar mounts
+	// the secret. Creation is idempotent; the password is never rotated.
+	if builder.SFTPEnabled(profile) {
+		if err := r.ensureSFTPSecret(ctx, server, profile); err != nil {
+			return ctrl.Result{}, fmt.Errorf("ensure sftp secret: %w", err)
+		}
+	}
+
+	// Lifecycle gate: spec.lifecycle.autoStart=false means the server should
+	// be stopped. Drain gracefully via the agent before scaling to 0.
+	stopping := !server.Spec.Lifecycle.AutoStartEnabled()
+	if stopping {
+		currentSts := &appsv1.StatefulSet{}
+		if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, currentSts); err != nil && !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		} else if err == nil && currentSts.Spec.Replicas != nil && *currentSts.Spec.Replicas > 0 && stsReady(currentSts) {
+			if err := r.callAgentShutdown(ctx, server); err != nil {
+				logger.Error(err, "agent shutdown failed, proceeding with scale-down")
+			}
+			if r.Recorder != nil {
+				r.Recorder.Event(server, corev1.EventTypeNormal, "AutoStartDisabled",
+					"stopping server: spec.lifecycle.autoStart is false")
+			}
+		}
+	}
+
 	// Step 3: Reconcile StatefulSet, Headless Service, Agent Service, PVC
 	sts := buildStatefulSet(server, podSpec, labelsMap)
+	if stopping {
+		zero := int32(0)
+		sts.Spec.Replicas = &zero
+	}
 	if err := controllerutil.SetControllerReference(server, sts, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -136,10 +189,20 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// ClusterIP service for agent gRPC (internal control plane communication only)
 	agentSvc := buildAgentService(server, labelsMap)
+	addAgentMetricsPort(agentSvc, profile)
 	if err := controllerutil.SetControllerReference(server, agentSvc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
 	if err := r.Patch(ctx, agentSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// LoadBalancer service for player traffic (external IP via MetalLB etc.)
+	gameSvc := buildGameService(server, profile, labelsMap, r.ExternalDNSZone)
+	if err := controllerutil.SetControllerReference(server, gameSvc, r.Scheme); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, gameSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -151,16 +214,33 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	// ServiceMonitor for the agent metrics endpoint, when the profile opts in
+	// and the Prometheus Operator is installed (skipped with an event otherwise).
+	if err := r.reconcileServiceMonitor(ctx, server, profile, labelsMap); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Step 4: Check readiness and update status
 	currentSts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, currentSts); err != nil {
 		return ctrl.Result{}, err
 	}
+	if stopping {
+		// Server is intentionally stopped; report Stopped and skip
+		// health/idle checks until autoStart is set back to true.
+		if err := r.updateStoppedStatus(ctx, server); err != nil {
+			logger.Error(err, "failed to update GameServer status")
+			return ctrl.Result{}, err
+		}
+		recordGameServerMetrics(server)
+		return ctrl.Result{}, nil
+	}
 	ready := stsReady(currentSts)
-	if err := r.updateStatus(ctx, server, ready); err != nil {
+	if err := r.updateStatus(ctx, server, profile, ready); err != nil {
 		logger.Error(err, "failed to update GameServer status")
 		return ctrl.Result{}, err
 	}
+	recordGameServerMetrics(server)
 
 	// Step 6: Agent health check and idle timeout
 	if ready {
@@ -174,6 +254,9 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err != nil {
 				logger.Error(err, "failed to check idle timeout")
 			}
+			// checkIdleTimeout refreshes status.players/playerCapacity and may
+			// change state to Idle — re-export the updated status.
+			recordGameServerMetrics(server)
 			if requeueAfter > 0 {
 				return ctrl.Result{RequeueAfter: requeueAfter}, nil
 			}
@@ -185,8 +268,52 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *GameServerReconciler) setProfileMissingCondition(
-	ctx context.Context,
+// ensureImagePullSecrets replicates the configured image pull secrets from the
+// operator's namespace into the target namespace so game server pods can pull
+// private images.
+func (r *GameServerReconciler) ensureImagePullSecrets(ctx context.Context, namespace string) error {
+	if len(r.ImagePullSecrets) == 0 || r.OperatorNamespace == "" || namespace == r.OperatorNamespace {
+		return nil
+	}
+	for _, name := range r.ImagePullSecrets {
+		src := &corev1.Secret{}
+		if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: r.OperatorNamespace}, src); err != nil {
+			return fmt.Errorf("get pull secret %s/%s: %w", r.OperatorNamespace, name, err)
+		}
+
+		dst := &corev1.Secret{}
+		err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, dst)
+		switch {
+		case apierrors.IsNotFound(err):
+			dst = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+					Labels:    map[string]string{"minato.io/replicated-from": r.OperatorNamespace},
+				},
+				Type: src.Type,
+				Data: src.Data,
+			}
+			if err := r.Create(ctx, dst); err != nil && !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("replicate pull secret to %s: %w", namespace, err)
+			}
+		case err != nil:
+			return err
+		default:
+			if dst.Labels["minato.io/replicated-from"] == "" {
+				continue // not managed by us; leave user-provided secret alone
+			}
+			dst.Type = src.Type
+			dst.Data = src.Data
+			if err := r.Update(ctx, dst); err != nil {
+				return fmt.Errorf("refresh pull secret in %s: %w", namespace, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *GameServerReconciler) setProfileMissingCondition(ctx context.Context,
 	server *operatorv1.GameServer,
 	err error,
 ) {
@@ -206,7 +333,27 @@ func (r *GameServerReconciler) setProfileMissingCondition(
 	_ = r.Status().Update(ctx, server)
 }
 
-func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operatorv1.GameServer, ready bool) error {
+// updateStoppedStatus reports the GameServer as intentionally stopped
+// (spec.lifecycle.autoStart=false) and clears player-facing endpoints.
+func (r *GameServerReconciler) updateStoppedStatus(ctx context.Context, server *operatorv1.GameServer) error {
+	server.Status.State = stateStopped
+	server.Status.AgentVersion = ""
+	server.Status.Endpoints = nil
+	server.Status.Players = 0
+
+	setCondition(&server.Status.Conditions, metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionFalse,
+		Reason:             "AutoStartDisabled",
+		Message:            "server is stopped: spec.lifecycle.autoStart is false",
+		ObservedGeneration: server.Generation,
+		LastTransitionTime: metav1.Now(),
+	})
+
+	return r.Status().Update(ctx, server)
+}
+
+func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operatorv1.GameServer, profile *operatorv1.GameProfile, ready bool) error {
 	state := stateProvisioning
 	if ready {
 		state = stateRunning
@@ -233,10 +380,58 @@ func (r *GameServerReconciler) updateStatus(ctx context.Context, server *operato
 
 	server.Status.State = state
 	server.Status.AgentVersion = ""
+	server.Status.Endpoints = r.resolveEndpoints(ctx, server, profile)
 	setCondition(&server.Status.Conditions, readyCondition)
 	setCondition(&server.Status.Conditions, agentCondition)
 
 	return r.Status().Update(ctx, server)
+}
+
+// resolveEndpoints maps exposed profile ports to the player-facing address of
+// the game server: the external-dns hostname when a zone is configured,
+// otherwise the LoadBalancer ingress IP. Empty until the address exists —
+// pod IPs are never published.
+func (r *GameServerReconciler) resolveEndpoints(ctx context.Context, server *operatorv1.GameServer, profile *operatorv1.GameProfile) []operatorv1.Endpoint {
+	address := ""
+	if r.ExternalDNSZone != "" {
+		address = server.Name + "." + r.ExternalDNSZone
+	} else {
+		svc := &corev1.Service{}
+		if err := r.Get(ctx, types.NamespacedName{Name: server.Name + "-game", Namespace: server.Namespace}, svc); err != nil {
+			return nil
+		}
+		if len(svc.Status.LoadBalancer.Ingress) == 0 {
+			return nil
+		}
+		ingress := svc.Status.LoadBalancer.Ingress[0]
+		address = ingress.IP
+		if address == "" {
+			address = ingress.Hostname
+		}
+	}
+	if address == "" {
+		return nil
+	}
+
+	endpoints := make([]operatorv1.Endpoint, 0, len(profile.Spec.Ports))
+	for _, p := range profile.Spec.Ports {
+		if !p.ExposedPort() {
+			continue
+		}
+		endpoints = append(endpoints, operatorv1.Endpoint{
+			Name:    p.Name,
+			Address: address,
+			Port:    p.ContainerPort,
+		})
+	}
+	if builder.SFTPEnabled(profile) {
+		endpoints = append(endpoints, operatorv1.Endpoint{
+			Name:    builder.SFTPPortName,
+			Address: address,
+			Port:    builder.SFTPPort,
+		})
+	}
+	return endpoints
 }
 
 func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *operatorv1.GameServer) error {
@@ -255,10 +450,22 @@ func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *ope
 		return err
 	}
 
+	gameSvc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: server.Name + "-game", Namespace: server.Namespace}}
+	if err := r.Delete(ctx, gameSvc); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
 	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: server.Name, Namespace: server.Namespace}}
 	if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+
+	sftpSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: builder.SFTPSecretName(server.Name), Namespace: server.Namespace}}
+	if err := r.Delete(ctx, sftpSecret); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	deleteGameServerMetrics(server.Namespace, server.Name)
 
 	return nil
 }
@@ -270,7 +477,9 @@ func agentAddress(server *operatorv1.GameServer) string {
 }
 
 // dialAgent establishes a gRPC connection to the agent for the given GameServer.
-func dialAgent(server *operatorv1.GameServer) (*grpc.ClientConn, error) {
+// Declared as a package-level variable so controller tests can stub agent
+// connectivity (e.g. with a bufconn fake agent).
+var dialAgent = func(server *operatorv1.GameServer) (*grpc.ClientConn, error) {
 	addr := agentAddress(server)
 	return grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -510,6 +719,82 @@ func buildHeadlessService(
 			PublishNotReadyAddresses: true, // Allow DNS resolution even before pod is ready
 		},
 	}
+}
+
+// buildGameService creates the player-facing LoadBalancer Service for a game
+// server. One service port per exposed profile port; the external IP is
+// assigned by the cluster's load balancer (e.g. MetalLB) and surfaced via
+// status.endpoints. spec.loadBalancerIP pins the address; when dnsZone is
+// set, an external-dns hostname annotation is added.
+func buildGameService(
+	server *operatorv1.GameServer,
+	profile *operatorv1.GameProfile,
+	labelsMap map[string]string,
+	dnsZone string,
+) *corev1.Service {
+	type protoPort struct {
+		port     int32
+		protocol corev1.Protocol
+	}
+	seen := map[protoPort]bool{}
+	ports := []corev1.ServicePort{}
+	for _, p := range profile.Spec.Ports {
+		if !p.ExposedPort() {
+			continue
+		}
+		protocol := p.Protocol
+		if protocol == "" {
+			protocol = corev1.ProtocolTCP
+		}
+		key := protoPort{p.ContainerPort, protocol}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		ports = append(ports, corev1.ServicePort{
+			Name:       p.Name,
+			Port:       p.ContainerPort,
+			TargetPort: intstr.FromInt32(p.ContainerPort),
+			Protocol:   protocol,
+		})
+	}
+
+	// The SFTP sidecar (profile capability) is exposed on the same
+	// player-facing LoadBalancer service; no second LB is created.
+	if builder.SFTPEnabled(profile) {
+		key := protoPort{builder.SFTPPort, corev1.ProtocolTCP}
+		if !seen[key] {
+			ports = append(ports, corev1.ServicePort{
+				Name:       builder.SFTPPortName,
+				Port:       builder.SFTPPort,
+				TargetPort: intstr.FromInt32(builder.SFTPPort),
+				Protocol:   corev1.ProtocolTCP,
+			})
+		}
+	}
+
+	svc := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      server.Name + "-game",
+			Namespace: server.Namespace,
+			Labels:    labelsMap,
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeLoadBalancer,
+			Selector: labelsMap,
+			Ports:    ports,
+		},
+	}
+	if server.Spec.LoadBalancerIP != "" {
+		svc.Spec.LoadBalancerIP = server.Spec.LoadBalancerIP
+	}
+	if dnsZone != "" {
+		svc.Annotations = map[string]string{
+			"external-dns.alpha.kubernetes.io/hostname": server.Name + "." + dnsZone,
+		}
+	}
+	return svc
 }
 
 // buildAgentService creates a ClusterIP Service for the agent gRPC port.

@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -36,6 +38,9 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
+	// Registering the Prometheus Operator types is harmless when the CRDs are
+	// absent; the gameserver controller feature-detects them at runtime.
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 }
 
 // nolint:gocyclo
@@ -170,7 +175,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	gsr := &controllers.GameServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	var pullSecrets []string
+	if v := os.Getenv("IMAGE_PULL_SECRETS"); v != "" {
+		for name := range strings.SplitSeq(v, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				pullSecrets = append(pullSecrets, name)
+			}
+		}
+	}
+	gsr := &controllers.GameServerReconciler{
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		OperatorNamespace: os.Getenv("POD_NAMESPACE"),
+		ImagePullSecrets:  pullSecrets,
+		ExternalDNSZone:   os.Getenv("EXTERNAL_DNS_ZONE"),
+		Recorder:          mgr.GetEventRecorderFor("gameserver-controller"),
+	}
 	if err := gsr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServer")
 		os.Exit(1)
@@ -187,7 +207,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	gfr := &controllers.GameServerFleetReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
+	gfr := &controllers.GameServerFleetReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("gameserverfleet-controller"),
+	}
 	if err := gfr.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "GameServerFleet")
 		os.Exit(1)

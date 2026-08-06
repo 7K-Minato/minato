@@ -68,6 +68,19 @@ spec:
             {{- end }}
           securityContext:
             {{- toYaml .Values.operator.containerSecurityContext | nindent 12 }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- if .Values.operator.imagePullSecrets }}
+            - name: IMAGE_PULL_SECRETS
+              value: {{ join "," .Values.operator.imagePullSecrets | quote }}
+            {{- end }}
+            {{- if .Values.operator.externalDNSZone }}
+            - name: EXTERNAL_DNS_ZONE
+              value: {{ .Values.operator.externalDNSZone | quote }}
+            {{- end }}
           {{- if .Values.webhook.enabled }}
           volumeMounts:
             - name: webhook-certs
