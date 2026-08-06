@@ -124,6 +124,14 @@ type GameServer struct {
 	Status     GameServerStatus `json:"status,omitempty"`
 }
 
+// SFTPInfo is the SFTP connection info for a game server.
+type SFTPInfo struct {
+	Host     string `json:"host"`
+	Port     int32  `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 // ActionParam describes one parameter of an action.
 type ActionParam struct {
 	Type     string `json:"type,omitempty"`
@@ -452,6 +460,26 @@ func (c *Client) DeleteGameServer(ctx context.Context, namespace, name string) e
 		return apiError(resp.StatusCode(), resp.Body)
 	}
 	return nil
+}
+
+// GetSFTPInfo returns the SFTP connection info (host, port, username,
+// password) for a game server whose profile enables capabilities.sftp
+// (operator+ role required).
+func (c *Client) GetSFTPInfo(ctx context.Context, namespace, name string) (*SFTPInfo, error) {
+	resp, err := c.inner.GetSFTPInfoWithResponse(ctx, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return nil, apiError(resp.StatusCode(), resp.Body)
+	}
+	out := &SFTPInfo{
+		Host:     resp.JSON200.Host,
+		Port:     int32(resp.JSON200.Port),
+		Username: resp.JSON200.Username,
+		Password: resp.JSON200.Password,
+	}
+	return out, nil
 }
 
 // UpdateGameServerLifecycle patches a GameServer's lifecycle. Pass nil for

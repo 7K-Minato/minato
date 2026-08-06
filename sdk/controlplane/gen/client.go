@@ -462,6 +462,17 @@ type ResourceRequirements struct {
 	} `json:"requests,omitempty"`
 }
 
+// SFTPInfo defines model for SFTPInfo.
+type SFTPInfo struct {
+	// Host External hostname or IP of the game server
+	Host     string `json:"host"`
+	Password string `json:"password"`
+
+	// Port SFTP port on the player-facing LoadBalancer service
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+}
+
 // StorageSpec defines model for StorageSpec.
 type StorageSpec struct {
 	Size        *string `json:"size,omitempty"`
@@ -646,6 +657,9 @@ type ClientInterface interface {
 
 	// GetActionExecution request
 	GetActionExecution(ctx context.Context, namespace Namespace, name Name, executionId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSFTPInfo request
+	GetSFTPInfo(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListSnapshots request
 	ListSnapshots(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -935,6 +949,18 @@ func (c *Client) GetConsole(ctx context.Context, namespace Namespace, name Name,
 
 func (c *Client) GetActionExecution(ctx context.Context, namespace Namespace, name Name, executionId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetActionExecutionRequest(c.Server, namespace, name, executionId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSFTPInfo(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSFTPInfoRequest(c.Server, namespace, name)
 	if err != nil {
 		return nil, err
 	}
@@ -1741,6 +1767,47 @@ func NewGetActionExecutionRequest(server string, namespace Namespace, name Name,
 	return req, nil
 }
 
+// NewGetSFTPInfoRequest generates requests for GetSFTPInfo
+func NewGetSFTPInfoRequest(server string, namespace Namespace, name Name) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "namespace", runtime.ParamLocationPath, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/gameservers/%s/%s/sftp", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListSnapshotsRequest generates requests for ListSnapshots
 func NewListSnapshotsRequest(server string, namespace Namespace, name Name) (*http.Request, error) {
 	var err error
@@ -2070,6 +2137,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetActionExecutionWithResponse request
 	GetActionExecutionWithResponse(ctx context.Context, namespace Namespace, name Name, executionId string, reqEditors ...RequestEditorFn) (*GetActionExecutionResponse, error)
+
+	// GetSFTPInfoWithResponse request
+	GetSFTPInfoWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*GetSFTPInfoResponse, error)
 
 	// ListSnapshotsWithResponse request
 	ListSnapshotsWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*ListSnapshotsResponse, error)
@@ -2503,6 +2573,31 @@ func (r GetActionExecutionResponse) StatusCode() int {
 	return 0
 }
 
+type GetSFTPInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SFTPInfo
+	JSON401      *Unauthorized
+	JSON403      *Forbidden
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSFTPInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSFTPInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListSnapshotsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2858,6 +2953,15 @@ func (c *ClientWithResponses) GetActionExecutionWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseGetActionExecutionResponse(rsp)
+}
+
+// GetSFTPInfoWithResponse request returning *GetSFTPInfoResponse
+func (c *ClientWithResponses) GetSFTPInfoWithResponse(ctx context.Context, namespace Namespace, name Name, reqEditors ...RequestEditorFn) (*GetSFTPInfoResponse, error) {
+	rsp, err := c.GetSFTPInfo(ctx, namespace, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSFTPInfoResponse(rsp)
 }
 
 // ListSnapshotsWithResponse request returning *ListSnapshotsResponse
@@ -3604,6 +3708,53 @@ func ParseGetActionExecutionResponse(rsp *http.Response) (*GetActionExecutionRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSFTPInfoResponse parses an HTTP response from a GetSFTPInfoWithResponse call
+func ParseGetSFTPInfoResponse(rsp *http.Response) (*GetSFTPInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSFTPInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SFTPInfo
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound

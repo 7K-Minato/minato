@@ -242,6 +242,36 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /api/v1/gameservers/{namespace}/{name}/sftp:
+    get:
+      operationId: getSFTPInfo
+      tags: [GameServers]
+      summary: Get SFTP connection info
+      description: |
+        Returns the SFTP connection info (host, port, username, password) for
+        a game server whose GameProfile enables `capabilities.sftp`. Host and
+        port come from the server's published `sftp` status endpoint;
+        credentials come from the server-scoped Kubernetes Secret. Requires
+        operator role or higher. Returns 404 when the server does not exist,
+        the profile does not enable SFTP, or credentials/endpoints are not
+        provisioned yet.
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/Name"
+      responses:
+        "200":
+          description: SFTP connection info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SFTPInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/v1/gameservers/{namespace}/{name}/actions:
     get:
       operationId: listActions
@@ -736,6 +766,21 @@ components:
           type: string
         port:
           type: integer
+
+    SFTPInfo:
+      type: object
+      properties:
+        host:
+          type: string
+          description: External hostname or IP of the game server
+        port:
+          type: integer
+          description: SFTP port on the player-facing LoadBalancer service
+        username:
+          type: string
+        password:
+          type: string
+      required: [host, port, username, password]
 
     StorageSpec:
       type: object

@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
+	"github.com/7k-minato/minato/internal/controllers/builder"
 	"github.com/7k-minato/minato/internal/controlplane/audit"
 	"github.com/7k-minato/minato/internal/controlplane/auth"
 	"github.com/7k-minato/minato/internal/controlplane/oapi"
@@ -287,6 +289,65 @@ func (api *controlPlaneAPI) UpdateGameServerLifecycle(w http.ResponseWriter, r *
 
 func (api *controlPlaneAPI) GetConsole(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
 	api.serveConsole(w, r, string(namespace), string(name))
+}
+
+// SFTP
+
+// GetSFTPInfo returns the SFTP connection info for a game server whose
+// profile enables capabilities.sftp. Host/port come from the server's
+// published "sftp" status endpoint; credentials from the server-scoped
+// Secret. The audit middleware logs the request; credentials are never
+// logged.
+func (api *controlPlaneAPI) GetSFTPInfo(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
+	ns, serverName := string(namespace), string(name)
+
+	server := &operatorv1.GameServer{}
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: serverName, Namespace: ns}, server); err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+
+	profile := &operatorv1.GameProfile{}
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: server.Spec.Profile}, profile); err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if !builder.SFTPEnabled(profile) {
+		writeError(w, http.StatusNotFound, fmt.Errorf("sftp is not enabled for game server %s/%s", ns, serverName))
+		return
+	}
+
+	var endpoint *operatorv1.Endpoint
+	for i := range server.Status.Endpoints {
+		if server.Status.Endpoints[i].Name == builder.SFTPPortName {
+			endpoint = &server.Status.Endpoints[i]
+			break
+		}
+	}
+	if endpoint == nil {
+		writeError(w, http.StatusNotFound, fmt.Errorf("sftp endpoint for game server %s/%s is not published yet", ns, serverName))
+		return
+	}
+
+	secret := &corev1.Secret{}
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: builder.SFTPSecretName(serverName), Namespace: ns}, secret); err != nil {
+		writeError(w, http.StatusNotFound, fmt.Errorf("sftp credentials for game server %s/%s are not provisioned yet", ns, serverName))
+		return
+	}
+	username := string(secret.Data[builder.SFTPUsernameKey])
+	password := string(secret.Data[builder.SFTPPasswordKey])
+	if username == "" || password == "" {
+		writeError(w, http.StatusNotFound, fmt.Errorf("sftp credentials for game server %s/%s are incomplete", ns, serverName))
+		return
+	}
+
+	audit.LogAction("gameserver.sftp-info-read", serverName, auth.GetUser(r.Context()))
+	respondJSON(w, http.StatusOK, oapi.SFTPInfo{
+		Host:     endpoint.Address,
+		Port:     int(endpoint.Port),
+		Username: username,
+		Password: password,
+	})
 }
 
 // Actions

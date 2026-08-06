@@ -6,6 +6,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -76,7 +77,8 @@ func (r *GameServerReconciler) reconcileServiceMonitor(
 
 	if !serviceMonitorEnabled(profile) {
 		sm := &monitoringv1.ServiceMonitor{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
-		if err := r.Delete(ctx, sm); err != nil && !apierrors.IsNotFound(err) {
+		// NoMatchError: Prometheus Operator CRDs absent — nothing to clean up.
+		if err := r.Delete(ctx, sm); err != nil && !apierrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 			return err
 		}
 		return nil

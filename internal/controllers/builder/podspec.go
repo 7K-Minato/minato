@@ -70,6 +70,10 @@ func BuildGameServerPodSpecWithPullSecrets(profile *operatorv1.GameProfile, serv
 		Containers: []corev1.Container{gameContainer, agentContainer},
 	}
 
+	if SFTPEnabled(profile) {
+		applySFTPSidecar(&podSpec, profile, server)
+	}
+
 	for _, name := range pullSecrets {
 		podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: name})
 	}

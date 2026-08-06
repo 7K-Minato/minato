@@ -263,3 +263,42 @@ func TestFleetWriteEndpoints(t *testing.T) {
 		t.Fatalf("delete fleet: %v", err)
 	}
 }
+
+func TestGetSFTPInfo(t *testing.T) {
+	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test-key" {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/gameservers/tenant-1/mc-1/sftp":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"host":     "mc-1.games.example.com",
+				"port":     2022,
+				"username": "minato",
+				"password": "0123456789abcdef0123456789abcdef",
+			})
+		default:
+			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		}
+	})
+
+	info, err := c.GetSFTPInfo(t.Context(), "tenant-1", "mc-1")
+	if err != nil {
+		t.Fatalf("get sftp info: %v", err)
+	}
+	if info.Host != "mc-1.games.example.com" || info.Port != 2022 ||
+		info.Username != "minato" || info.Password != "0123456789abcdef0123456789abcdef" {
+		t.Fatalf("unexpected sftp info: %+v", info)
+	}
+
+	if _, err := c.GetSFTPInfo(t.Context(), "tenant-1", "missing"); err == nil {
+		t.Fatal("expected error for missing server")
+	} else {
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
+			t.Fatalf("expected 404 APIError, got %v", err)
+		}
+	}
+}

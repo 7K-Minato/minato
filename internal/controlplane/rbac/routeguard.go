@@ -27,6 +27,7 @@ var DefaultRules = []RouteRule{
 	{Method: http.MethodDelete, Pattern: "/api/v1/gameservers/{namespace}/{name}", Roles: []string{"admin"}},
 	{Method: http.MethodPatch, Pattern: "/api/v1/gameservers/{namespace}/{name}", Roles: []string{"operator", "admin"}},
 	{Method: http.MethodGet, Pattern: "/api/v1/gameservers/{namespace}/{name}/console", Roles: []string{"operator", "admin"}},
+	{Method: http.MethodGet, Pattern: "/api/v1/gameservers/{namespace}/{name}/sftp", Roles: []string{"operator", "admin"}},
 	{Method: http.MethodPost, Pattern: "/api/v1/gameservers/{namespace}/{name}/actions/{action}", Roles: []string{"operator", "admin"}},
 	{Method: http.MethodPost, Pattern: "/api/v1/gameservers/{namespace}/{name}/snapshots", Roles: []string{"operator", "admin"}},
 	{Method: http.MethodPost, Pattern: "/api/v1/gameserverfleets/{namespace}", Roles: []string{"admin"}},

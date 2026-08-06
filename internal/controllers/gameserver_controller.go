@@ -72,6 +72,7 @@ type GameServerReconciler struct {
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameprofiles,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is the main entrypoint for the GameServer controller.
@@ -137,6 +138,14 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	labelsMap := buildGameServerLabels(server, profile)
+
+	// SFTP credentials must exist before the pod starts: the sidecar mounts
+	// the secret. Creation is idempotent; the password is never rotated.
+	if builder.SFTPEnabled(profile) {
+		if err := r.ensureSFTPSecret(ctx, server, profile); err != nil {
+			return ctrl.Result{}, fmt.Errorf("ensure sftp secret: %w", err)
+		}
+	}
 
 	// Lifecycle gate: spec.lifecycle.autoStart=false means the server should
 	// be stopped. Drain gracefully via the agent before scaling to 0.
@@ -415,6 +424,13 @@ func (r *GameServerReconciler) resolveEndpoints(ctx context.Context, server *ope
 			Port:    p.ContainerPort,
 		})
 	}
+	if builder.SFTPEnabled(profile) {
+		endpoints = append(endpoints, operatorv1.Endpoint{
+			Name:    builder.SFTPPortName,
+			Address: address,
+			Port:    builder.SFTPPort,
+		})
+	}
 	return endpoints
 }
 
@@ -441,6 +457,11 @@ func (r *GameServerReconciler) cleanupResources(ctx context.Context, server *ope
 
 	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: server.Name, Namespace: server.Namespace}}
 	if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	sftpSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: builder.SFTPSecretName(server.Name), Namespace: server.Namespace}}
+	if err := r.Delete(ctx, sftpSecret); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -736,6 +757,20 @@ func buildGameService(
 			TargetPort: intstr.FromInt32(p.ContainerPort),
 			Protocol:   protocol,
 		})
+	}
+
+	// The SFTP sidecar (profile capability) is exposed on the same
+	// player-facing LoadBalancer service; no second LB is created.
+	if builder.SFTPEnabled(profile) {
+		key := protoPort{builder.SFTPPort, corev1.ProtocolTCP}
+		if !seen[key] {
+			ports = append(ports, corev1.ServicePort{
+				Name:       builder.SFTPPortName,
+				Port:       builder.SFTPPort,
+				TargetPort: intstr.FromInt32(builder.SFTPPort),
+				Protocol:   corev1.ProtocolTCP,
+			})
+		}
 	}
 
 	svc := &corev1.Service{

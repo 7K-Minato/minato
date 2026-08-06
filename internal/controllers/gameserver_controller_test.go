@@ -507,6 +507,69 @@ func TestBuildGameServicePinAndDNS(t *testing.T) {
 		svc.Annotations["external-dns.alpha.kubernetes.io/hostname"])
 }
 
+func TestBuildGameServiceSFTPPort(t *testing.T) {
+	server := newTestGameServer()
+	profile := newTestProfile()
+	labels := buildGameServerLabels(server, profile)
+
+	// Without the capability, no sftp port.
+	svc := buildGameService(server, profile, labels, "")
+	for _, p := range svc.Spec.Ports {
+		assert.NotEqual(t, "sftp", p.Name)
+	}
+
+	// With the capability, the sftp port is added to the same LB service.
+	profile.Spec.Capabilities = &operatorv1.CapabilitiesSpec{SFTP: true}
+	svc = buildGameService(server, profile, labels, "games.example.com")
+	var sftpPort *corev1.ServicePort
+	for i := range svc.Spec.Ports {
+		if svc.Spec.Ports[i].Name == "sftp" {
+			sftpPort = &svc.Spec.Ports[i]
+		}
+	}
+	require.NotNil(t, sftpPort, "sftp service port must be present")
+	assert.Equal(t, int32(builder.SFTPPort), sftpPort.Port)
+	assert.Equal(t, corev1.ProtocolTCP, sftpPort.Protocol)
+	// external-dns hostname annotation still applies to the shared service.
+	assert.Equal(t, server.Name+".games.example.com",
+		svc.Annotations["external-dns.alpha.kubernetes.io/hostname"])
+
+	// A profile port colliding on 2022/TCP wins; no duplicate sftp port.
+	profile.Spec.Ports = append(profile.Spec.Ports,
+		operatorv1.PortSpec{Name: "already-2022", ContainerPort: builder.SFTPPort, Protocol: corev1.ProtocolTCP})
+	svc = buildGameService(server, profile, labels, "")
+	count := 0
+	for _, p := range svc.Spec.Ports {
+		if p.Port == builder.SFTPPort {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "port 2022 must not be duplicated")
+}
+
+func TestGameServerReconciler_ResolveEndpointsSFTP(t *testing.T) {
+	scheme := newTestScheme()
+	server := newTestGameServer()
+	profile := newTestProfile()
+	profile.Spec.Capabilities = &operatorv1.CapabilitiesSpec{SFTP: true}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(server).Build()
+	reconciler := &GameServerReconciler{Client: cl, Scheme: scheme, ExternalDNSZone: "games.example.com"}
+
+	endpoints := reconciler.resolveEndpoints(context.Background(), server, profile)
+	require.Len(t, endpoints, len(profile.Spec.Ports)+1)
+	sftp := endpoints[len(endpoints)-1]
+	assert.Equal(t, "sftp", sftp.Name)
+	assert.Equal(t, server.Name+".games.example.com", sftp.Address)
+	assert.Equal(t, int32(builder.SFTPPort), sftp.Port)
+
+	// Without the capability, no sftp endpoint.
+	profile.Spec.Capabilities = nil
+	endpoints = reconciler.resolveEndpoints(context.Background(), server, profile)
+	for _, e := range endpoints {
+		assert.NotEqual(t, "sftp", e.Name)
+	}
+}
+
 func TestGameServerReconciler_ResolveEndpointsDNSZone(t *testing.T) {
 	scheme := newTestScheme()
 	server := newTestGameServer()
