@@ -341,9 +341,9 @@ func TestGameServerFleetReconciler_HandleRollingUpdate(t *testing.T) {
 	t.Skip("Rolling update tested via integration tests")
 }
 
-func runningFleetServer(name, ns string) *operatorv1.GameServer {
+func runningFleetServer() *operatorv1.GameServer {
 	return &operatorv1.GameServer{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet-0", Namespace: "default"},
 		Status:     operatorv1.GameServerStatus{State: "Running", AgentVersion: "v1.0.0"},
 	}
 }
@@ -372,7 +372,7 @@ func TestGameServerFleetReconciler_DrainServer_CallsAgentPrepareShutdown(t *test
 		},
 	}
 
-	r.drainServer(context.Background(), fleet, runningFleetServer("fleet-0", "default"))
+	r.drainServer(context.Background(), fleet, runningFleetServer())
 
 	assert.Equal(t, int32(1), agent.shutdownCalls.Load())
 	req := agent.lastShutdown.Load()
@@ -393,7 +393,7 @@ func TestGameServerFleetReconciler_DrainServer_DefaultTimeout(t *testing.T) {
 
 	fleet := &operatorv1.GameServerFleet{ObjectMeta: metav1.ObjectMeta{Name: "fleet", Namespace: "default"}}
 
-	r.drainServer(context.Background(), fleet, runningFleetServer("fleet-0", "default"))
+	r.drainServer(context.Background(), fleet, runningFleetServer())
 
 	assert.Equal(t, int32(1), agent.shutdownCalls.Load())
 	req := agent.lastShutdown.Load()
@@ -447,7 +447,7 @@ func TestGameServerFleetReconciler_DrainServer_TimeoutProceeds(t *testing.T) {
 	}
 
 	start := time.Now()
-	r.drainServer(context.Background(), fleet, runningFleetServer("fleet-0", "default"))
+	r.drainServer(context.Background(), fleet, runningFleetServer())
 	elapsed := time.Since(start)
 
 	// Drain must give up at ~1s, not wait for the 5s agent.
@@ -469,5 +469,5 @@ func TestGameServerFleetReconciler_DrainServer_DialFailureProceeds(t *testing.T)
 	r := &GameServerFleetReconciler{Client: cl, Scheme: scheme}
 
 	// Must not panic or block; deletion proceeds after this returns.
-	r.drainServer(context.Background(), nil, runningFleetServer("fleet-0", "default"))
+	r.drainServer(context.Background(), nil, runningFleetServer())
 }

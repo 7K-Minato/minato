@@ -93,9 +93,9 @@ func cloudErr(err error) error {
 
 func printTable(header []string, rows [][]string) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, strings.Join(header, "\t"))
+	_, _ = fmt.Fprintln(w, strings.Join(header, "\t"))
 	for _, r := range rows {
-		fmt.Fprintln(w, strings.Join(r, "\t"))
+		_, _ = fmt.Fprintln(w, strings.Join(r, "\t"))
 	}
 	_ = w.Flush()
 }

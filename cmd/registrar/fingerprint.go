@@ -77,7 +77,7 @@ func kubeSystemUID(ctx context.Context, client *http.Client, baseURL, token stri
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("get kube-system namespace: status %d", resp.StatusCode)
 	}

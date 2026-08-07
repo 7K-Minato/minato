@@ -36,7 +36,7 @@ func cloudSnapshotsCmd() *cobra.Command {
 						name = derefStr(s.Metadata.Name)
 					}
 					if s.Status != nil {
-						state = derefStr((*string)(s.Status.State))
+						state = derefStr(s.Status.State)
 						size = derefStr(s.Status.Size)
 						readyAt = derefTime(s.Status.ReadyAt)
 					}

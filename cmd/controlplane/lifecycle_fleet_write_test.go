@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	operatorv1 "github.com/7k-minato/minato/api/operator/v1"
 )
@@ -23,7 +22,7 @@ func lifecycleTestServer() *operatorv1.GameServer {
 		Spec: operatorv1.GameServerSpec{
 			Profile: "minecraft",
 			Lifecycle: operatorv1.LifecycleSpec{
-				AutoStart:          ptr.To(true),
+				AutoStart:          new(true),
 				IdleTimeoutSeconds: 300,
 			},
 		},
@@ -43,21 +42,21 @@ func TestUpdateGameServerLifecycle(t *testing.T) {
 			name:          "set autoStart false",
 			body:          `{"spec":{"lifecycle":{"autoStart":false}}}`,
 			wantStatus:    http.StatusOK,
-			wantAutoStart: ptr.To(false),
+			wantAutoStart: new(false),
 			wantIdleSecs:  300, // untouched
 		},
 		{
 			name:          "set idleTimeoutSeconds",
 			body:          `{"spec":{"lifecycle":{"idleTimeoutSeconds":60}}}`,
 			wantStatus:    http.StatusOK,
-			wantAutoStart: ptr.To(true), // untouched
+			wantAutoStart: new(true), // untouched
 			wantIdleSecs:  60,
 		},
 		{
 			name:          "set both",
 			body:          `{"spec":{"lifecycle":{"autoStart":true,"idleTimeoutSeconds":0}}}`,
 			wantStatus:    http.StatusOK,
-			wantAutoStart: ptr.To(true),
+			wantAutoStart: new(true),
 			wantIdleSecs:  0,
 		},
 		{

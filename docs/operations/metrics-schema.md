@@ -10,14 +10,54 @@ dashboard compatibility.
 
 | Metric Name | Type | Labels | Description | Status |
 | ------------ | ------ | -------- | ------------- | -------- |
-| `minato_operator_reconciliations_total` | Counter | `controller`, `result` | Total number of reconciliations | planned |
+| `minato_reconcile_duration_seconds` | Histogram | `controller` | Duration of controller reconciliations (`gameserver`, `gameserverfleet`, `gamesnapshot`, `actionexecution`) | implemented |
+| `minato_reconcile_errors_total` | Counter | `controller` | Reconciliations that returned an error | implemented |
 | `minato_gameservers` | Gauge | `namespace`, `profile`, `server`, `state` | One series per GameServer (value always 1), re-exported on every reconcile and removed on deletion | implemented |
+| `minato_gameserver_provisioning_duration_seconds` | Histogram | `namespace`, `profile` | Time from GameServer creation to the first transition to `Running` (observed once per server; Idle → Running re-starts are excluded) | implemented |
+| `minato_fleet_replicas` | Gauge | `namespace`, `fleet`, `kind` | GameServerFleet replica counts; `kind` is `desired` (spec), `ready` or `updated` (status). Removed on fleet deletion | implemented |
 | `minato_action_executions_total` | Counter | `action`, `result` | Total ActionExecutions reaching a terminal state (`Succeeded`, `Failed`, `TimedOut`, `Rejected`) | implemented |
 | `minato_players_online` | Gauge | `namespace`, `server` | Current player count, exported by the operator from `GameServer.status.players` | implemented |
 | `minato_player_capacity` | Gauge | `namespace`, `server` | Player capacity, exported by the operator from `GameServer.status.playerCapacity` | implemented |
+| `minato_agent_unreachable_total` | Counter | `namespace`, `server` | Failed agent health checks (agent dial or HealthCheck RPC failure). Backs the `MinatoAgentUnreachable` alert | implemented |
+| `minato_webhook_requests_total` | Counter | `webhook`, `operation`, `result` | Admission webhook validations (`webhook`: `gameserver`/`gameprofile`, `operation`: `create`/`update`/`delete`, `result`: `allowed`/`denied`) | implemented |
+| `minato_webhook_request_duration_seconds` | Histogram | `webhook`, `operation` | Duration of admission webhook validations | implemented |
 | `minato_action_duration_seconds` | Histogram | `action`, `profile` | Action execution duration | planned |
-| `minato_agent_unreachable_total` | Counter | `profile`, `namespace` | Agent unreachable events | planned |
 | `minato_idle_shutdowns_total` | Counter | `profile` | Idle shutdown events | planned |
+
+## Control Plane Metrics
+
+The control plane exposes its metrics on a **dedicated listener** (env
+`METRICS_ADDR`, default `:9090`; empty disables) so `/metrics` is reachable
+for in-cluster scraping without going through the auth/RBAC middleware chain.
+
+| Metric Name | Type | Labels | Description | Status |
+| ------------ | ------ | -------- | ------------- | -------- |
+| `minato_controlplane_http_requests_total` | Counter | `method`, `route`, `status` | HTTP requests; `route` is the chi route pattern (`unmatched` for 404s) | implemented |
+| `minato_controlplane_http_request_duration_seconds` | Histogram | `method`, `route` | HTTP request duration | implemented |
+
+## Registrar Metrics
+
+The registrar exposes its metrics from its own registry on a dedicated
+listener (env `METRICS_ADDR`, default `:9091`; empty disables). It also pushes
+a GameServer summary to minato cloud every `METRICS_PUSH_INTERVAL` (default
+30s, `METRICS_PUSH_ENABLED=false` disables): it lists servers from the local
+control plane (`GET /api/v1/gameservers`) and POSTs them to
+`{CLOUD_URL}/api/v1/clusters/{CLUSTER_NAME}/metrics`. A 404 (older cloud
+without the endpoint) is tolerated.
+
+| Metric Name | Type | Labels | Description | Status |
+| ------------ | ------ | -------- | ------------- | -------- |
+| `minato_registrar_heartbeats_total` | Counter | `result` | Heartbeats to minato cloud (`ok`, `error`, `reregister`) | implemented |
+| `minato_registrar_metrics_push_total` | Counter | `result` | GameServer metrics pushes (`ok`, `error`, `unsupported`) | implemented |
+
+## Cloud API Client Metrics
+
+The `internal/cloudapi` client (used by minato-ctl and other non-operator
+binaries) registers into the default prometheus registry.
+
+| Metric Name | Type | Labels | Description | Status |
+| ------------ | ------ | -------- | ------------- | -------- |
+| `minato_cloudapi_request_duration_seconds` | Histogram | `operation`, `result` | minato-cloud API call duration; `operation` is the client method name, `result` is `ok`/`error` | implemented |
 
 > **Note:** `minato_players_online` and `minato_player_capacity` are owned by
 > the operator. Agents MUST NOT emit these metric names — the operator exports

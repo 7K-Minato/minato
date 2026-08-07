@@ -84,7 +84,9 @@ type GameServerReconciler struct {
 //  5. Check StatefulSet readiness and update GameServer status.
 //  6. If ready, perform agent health check and idle-timeout evaluation.
 //  7. Requeue periodically while the server is ready to keep health/idle checks alive.
-func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+	start := time.Now()
+	defer func() { observeReconcile("gameserver", start, err) }()
 	logger := log.FromContext(ctx)
 
 	server := &operatorv1.GameServer{}
@@ -151,72 +153,13 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// be stopped. Drain gracefully via the agent before scaling to 0.
 	stopping := !server.Spec.Lifecycle.AutoStartEnabled()
 	if stopping {
-		currentSts := &appsv1.StatefulSet{}
-		if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, currentSts); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.drainBeforeStop(ctx, server); err != nil {
 			return ctrl.Result{}, err
-		} else if err == nil && currentSts.Spec.Replicas != nil && *currentSts.Spec.Replicas > 0 && stsReady(currentSts) {
-			if err := r.callAgentShutdown(ctx, server); err != nil {
-				logger.Error(err, "agent shutdown failed, proceeding with scale-down")
-			}
-			if r.Recorder != nil {
-				r.Recorder.Event(server, corev1.EventTypeNormal, "AutoStartDisabled",
-					"stopping server: spec.lifecycle.autoStart is false")
-			}
 		}
 	}
 
 	// Step 3: Reconcile StatefulSet, Headless Service, Agent Service, PVC
-	sts := buildStatefulSet(server, podSpec, labelsMap)
-	if stopping {
-		zero := int32(0)
-		sts.Spec.Replicas = &zero
-	}
-	if err := controllerutil.SetControllerReference(server, sts, r.Scheme); err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, sts, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Headless service for StatefulSet DNS stability (no load balancing)
-	headlessSvc := buildHeadlessService(server, labelsMap)
-	if err := controllerutil.SetControllerReference(server, headlessSvc, r.Scheme); err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, headlessSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// ClusterIP service for agent gRPC (internal control plane communication only)
-	agentSvc := buildAgentService(server, labelsMap)
-	addAgentMetricsPort(agentSvc, profile)
-	if err := controllerutil.SetControllerReference(server, agentSvc, r.Scheme); err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, agentSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// LoadBalancer service for player traffic (external IP via MetalLB etc.)
-	gameSvc := buildGameService(server, profile, labelsMap, r.ExternalDNSZone)
-	if err := controllerutil.SetControllerReference(server, gameSvc, r.Scheme); err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, gameSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	pvc := buildPVC(server, profile)
-	if err := controllerutil.SetControllerReference(server, pvc, r.Scheme); err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, pvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// ServiceMonitor for the agent metrics endpoint, when the profile opts in
-	// and the Prometheus Operator is installed (skipped with an event otherwise).
-	if err := r.reconcileServiceMonitor(ctx, server, profile, labelsMap); err != nil {
+	if err := r.reconcileChildResources(ctx, server, profile, podSpec, labelsMap, stopping); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -236,9 +179,18 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 	ready := stsReady(currentSts)
+	// Provisioning duration is observed exactly once per server: when the
+	// reconciler first transitions the state to Running from a non-Running
+	// prior state. (Idle -> Running re-activation after an idle shutdown is
+	// not provisioning; it re-uses an existing PVC and typically starts fast,
+	// so it is excluded to keep the histogram about cold starts.)
+	priorState := server.Status.State
 	if err := r.updateStatus(ctx, server, profile, ready); err != nil {
 		logger.Error(err, "failed to update GameServer status")
 		return ctrl.Result{}, err
+	}
+	if ready && priorState == stateProvisioning {
+		observeProvisioningDuration(server, time.Since(server.CreationTimestamp.Time))
 	}
 	recordGameServerMetrics(server)
 
@@ -266,6 +218,90 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// drainBeforeStop gracefully drains a running server via the agent when the
+// lifecycle gate asks for a stop. Drain failures are logged and evented but
+// never block the scale-down.
+func (r *GameServerReconciler) drainBeforeStop(ctx context.Context, server *operatorv1.GameServer) error {
+	logger := log.FromContext(ctx)
+
+	currentSts := &appsv1.StatefulSet{}
+	if err := r.Get(ctx, types.NamespacedName{Name: server.Name, Namespace: server.Namespace}, currentSts); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	} else if err == nil && currentSts.Spec.Replicas != nil && *currentSts.Spec.Replicas > 0 && stsReady(currentSts) {
+		if err := r.callAgentShutdown(ctx, server); err != nil {
+			logger.Error(err, "agent shutdown failed, proceeding with scale-down")
+		}
+		if r.Recorder != nil {
+			r.Recorder.Event(server, corev1.EventTypeNormal, "AutoStartDisabled",
+				"stopping server: spec.lifecycle.autoStart is false")
+		}
+	}
+	return nil
+}
+
+// reconcileChildResources applies the StatefulSet, services, PVC and
+// ServiceMonitor owned by the GameServer via server-side apply.
+func (r *GameServerReconciler) reconcileChildResources(
+	ctx context.Context,
+	server *operatorv1.GameServer,
+	profile *operatorv1.GameProfile,
+	podSpec corev1.PodSpec,
+	labelsMap map[string]string,
+	stopping bool,
+) error {
+	sts := buildStatefulSet(server, podSpec, labelsMap)
+	if stopping {
+		zero := int32(0)
+		sts.Spec.Replicas = &zero
+	}
+	if err := controllerutil.SetControllerReference(server, sts, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.Patch(ctx, sts, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return err
+	}
+
+	// Headless service for StatefulSet DNS stability (no load balancing)
+	headlessSvc := buildHeadlessService(server, labelsMap)
+	if err := controllerutil.SetControllerReference(server, headlessSvc, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.Patch(ctx, headlessSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return err
+	}
+
+	// ClusterIP service for agent gRPC (internal control plane communication only)
+	agentSvc := buildAgentService(server, labelsMap)
+	addAgentMetricsPort(agentSvc, profile)
+	if err := controllerutil.SetControllerReference(server, agentSvc, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.Patch(ctx, agentSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return err
+	}
+
+	// LoadBalancer service for player traffic (external IP via MetalLB etc.)
+	gameSvc := buildGameService(server, profile, labelsMap, r.ExternalDNSZone)
+	if err := controllerutil.SetControllerReference(server, gameSvc, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.Patch(ctx, gameSvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return err
+	}
+
+	pvc := buildPVC(server, profile)
+	if err := controllerutil.SetControllerReference(server, pvc, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.Patch(ctx, pvc, client.Apply, client.ForceOwnership, client.FieldOwner("minato-operator")); err != nil {
+		return err
+	}
+
+	// ServiceMonitor for the agent metrics endpoint, when the profile opts in
+	// and the Prometheus Operator is installed (skipped with an event otherwise).
+	return r.reconcileServiceMonitor(ctx, server, profile, labelsMap)
 }
 
 // ensureImagePullSecrets replicates the configured image pull secrets from the
@@ -498,6 +534,7 @@ func (r *GameServerReconciler) checkAgentHealth(ctx context.Context, server *ope
 	conn, err := dialAgent(server)
 	if err != nil {
 		logger.Error(err, "failed to connect to agent for health check")
+		recordAgentUnreachable(server.Namespace, server.Name)
 		return "", false
 	}
 	defer func() { _ = conn.Close() }()
@@ -506,6 +543,7 @@ func (r *GameServerReconciler) checkAgentHealth(ctx context.Context, server *ope
 	resp, err := agentClient.HealthCheck(ctx, &agentv1.HealthRequest{})
 	if err != nil {
 		logger.Error(err, "agent health check failed")
+		recordAgentUnreachable(server.Namespace, server.Name)
 		return "", false
 	}
 

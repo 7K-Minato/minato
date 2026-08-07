@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
-func newTestServer(t *testing.T, handler http.HandlerFunc) (*Client, *httptest.Server) {
+func newTestServer(t *testing.T, handler http.HandlerFunc) *Client {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
@@ -23,12 +23,12 @@ func newTestServer(t *testing.T, handler http.HandlerFunc) (*Client, *httptest.S
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	return c, srv
+	return c
 }
 
 func TestCreateAndGetGameServer(t *testing.T) {
 	var created map[string]any
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer test-key" {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
@@ -85,7 +85,7 @@ func TestCreateAndGetGameServer(t *testing.T) {
 }
 
 func TestErrorEnvelope(t *testing.T) {
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "gameserver not found"})
@@ -102,7 +102,7 @@ func TestErrorEnvelope(t *testing.T) {
 }
 
 func TestExecuteActionAndSnapshots(t *testing.T) {
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/gameservers/ns/gs/actions/restart":
@@ -137,7 +137,7 @@ func TestExecuteActionAndSnapshots(t *testing.T) {
 }
 
 func TestListProfilesIncludesParams(t *testing.T) {
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]map[string]any{
 			{
@@ -165,7 +165,7 @@ func TestListProfilesIncludesParams(t *testing.T) {
 
 func TestUpdateGameServerLifecycle(t *testing.T) {
 	var gotBody map[string]any
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method == http.MethodPatch && r.URL.Path == "/api/v1/gameservers/ns/gs" {
 			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
@@ -214,7 +214,7 @@ func TestUpdateGameServerLifecycle(t *testing.T) {
 
 func TestFleetWriteEndpoints(t *testing.T) {
 	var gotBody map[string]any
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/gameserverfleets/ns":
@@ -272,7 +272,7 @@ func TestFleetWriteEndpoints(t *testing.T) {
 
 func TestTraceContextPropagation(t *testing.T) {
 	var gotTraceparent string
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		gotTraceparent = r.Header.Get("traceparent")
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]map[string]any{})
@@ -298,7 +298,7 @@ func TestTraceContextPropagation(t *testing.T) {
 }
 
 func TestGetSFTPInfo(t *testing.T) {
-	c, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer test-key" {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return

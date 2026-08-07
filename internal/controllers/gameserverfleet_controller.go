@@ -48,7 +48,9 @@ type GameServerFleetReconciler struct {
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameserverfleets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameservers,verbs=get;list;watch;create;update;patch;delete
 
-func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GameServerFleetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+	start := time.Now()
+	defer func() { observeReconcile("gameserverfleet", start, err) }()
 	logger := log.FromContext(ctx)
 
 	fleet := &operatorv1.GameServerFleet{}
@@ -360,6 +362,7 @@ func (r *GameServerFleetReconciler) updateStatus(
 	fleet.Status.Replicas = int32(len(servers))
 	fleet.Status.ReadyReplicas = readyReplicas
 	fleet.Status.UpdatedReplicas = updatedReplicas
+	recordFleetMetrics(fleet)
 
 	// Update condition
 	status := metav1.ConditionTrue
@@ -407,6 +410,8 @@ func (r *GameServerFleetReconciler) cleanupFleet(ctx context.Context, fleet *ope
 			return err
 		}
 	}
+
+	deleteFleetMetrics(fleet.Namespace, fleet.Name)
 
 	return nil
 }

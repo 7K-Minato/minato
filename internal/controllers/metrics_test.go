@@ -3,8 +3,11 @@ package controllers
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +68,69 @@ func TestDeleteGameServerMetrics(t *testing.T) {
 		playersOnlineGauge.WithLabelValues(server.Namespace, server.Name)))
 	assert.Equal(t, float64(0), testutil.ToFloat64(
 		playerCapacityGauge.WithLabelValues(server.Namespace, server.Name)))
+}
+
+func TestObserveReconcile(t *testing.T) {
+	errBefore := testutil.ToFloat64(reconcileErrorsTotal.WithLabelValues("testctrl"))
+	observeReconcile("testctrl", time.Now(), nil)
+	assert.Equal(t, errBefore, testutil.ToFloat64(reconcileErrorsTotal.WithLabelValues("testctrl")),
+		"successful reconcile must not increment the error counter")
+
+	observeReconcile("testctrl", time.Now(), assert.AnError)
+	assert.Equal(t, errBefore+1, testutil.ToFloat64(reconcileErrorsTotal.WithLabelValues("testctrl")))
+
+	count := testutil.CollectAndCount(reconcileDuration)
+	assert.Greater(t, count, 0)
+}
+
+func TestObserveProvisioningDuration(t *testing.T) {
+	server := newTestGameServer()
+	server.Name = "metrics-provisioning"
+	server.Spec.Profile = "mc"
+	server.CreationTimestamp = metav1.NewTime(time.Now().Add(-90 * time.Second))
+
+	before := histogramSampleCount(t, provisioningDuration.WithLabelValues(server.Namespace, "mc"))
+	observeProvisioningDuration(server, time.Since(server.CreationTimestamp.Time))
+	after := histogramSampleCount(t, provisioningDuration.WithLabelValues(server.Namespace, "mc"))
+	assert.Equal(t, before+1, after)
+}
+
+func histogramSampleCount(t *testing.T, o prometheus.Observer) uint64 {
+	t.Helper()
+	h, ok := o.(prometheus.Histogram)
+	require.True(t, ok, "expected a histogram observer")
+	m := &dto.Metric{}
+	require.NoError(t, h.Write(m))
+	return m.GetHistogram().GetSampleCount()
+}
+
+func TestFleetMetrics(t *testing.T) {
+	fleet := &operatorv1.GameServerFleet{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet-metrics", Namespace: "default"},
+		Spec:       operatorv1.GameServerFleetSpec{Replicas: 3},
+		Status:     operatorv1.GameServerFleetStatus{ReadyReplicas: 2, UpdatedReplicas: 1},
+	}
+	t.Cleanup(func() { deleteFleetMetrics(fleet.Namespace, fleet.Name) })
+
+	recordFleetMetrics(fleet)
+
+	assert.Equal(t, float64(3), testutil.ToFloat64(
+		fleetReplicasGauge.WithLabelValues("default", "fleet-metrics", "desired")))
+	assert.Equal(t, float64(2), testutil.ToFloat64(
+		fleetReplicasGauge.WithLabelValues("default", "fleet-metrics", "ready")))
+	assert.Equal(t, float64(1), testutil.ToFloat64(
+		fleetReplicasGauge.WithLabelValues("default", "fleet-metrics", "updated")))
+
+	deleteFleetMetrics(fleet.Namespace, fleet.Name)
+	assert.Equal(t, float64(0), testutil.ToFloat64(
+		fleetReplicasGauge.WithLabelValues("default", "fleet-metrics", "desired")))
+}
+
+func TestRecordAgentUnreachable(t *testing.T) {
+	before := testutil.ToFloat64(agentUnreachableTotal.WithLabelValues("default", "srv-unreachable"))
+	recordAgentUnreachable("default", "srv-unreachable")
+	after := testutil.ToFloat64(agentUnreachableTotal.WithLabelValues("default", "srv-unreachable"))
+	assert.Equal(t, before+1, after)
 }
 
 func TestObserveActionExecution(t *testing.T) {

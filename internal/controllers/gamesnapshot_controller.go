@@ -44,7 +44,9 @@ type GameSnapshotReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
 
-func (r *GameSnapshotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GameSnapshotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+	start := time.Now()
+	defer func() { observeReconcile("gamesnapshot", start, err) }()
 	logger := log.FromContext(ctx)
 
 	snap := &operatorv1.GameSnapshot{}

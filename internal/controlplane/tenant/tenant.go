@@ -229,7 +229,7 @@ func BuildNetworkPolicy(namespace string, cfg Config) *networkingv1.NetworkPolic
 	tcp := corev1.ProtocolTCP
 	udp := corev1.ProtocolUDP
 
-	var gamePortRules []networkingv1.NetworkPolicyPort
+	gamePortRules := make([]networkingv1.NetworkPolicyPort, 0, 2*len(cfg.GamePorts))
 	for _, p := range cfg.GamePorts {
 		port := intstr.FromInt32(p)
 		gamePortRules = append(gamePortRules,

@@ -9,8 +9,8 @@ func MatchNamespacePattern(pattern, ns string) bool {
 	if pattern == "*" {
 		return true
 	}
-	if strings.HasSuffix(pattern, "*") {
-		return strings.HasPrefix(ns, strings.TrimSuffix(pattern, "*"))
+	if before, ok := strings.CutSuffix(pattern, "*"); ok {
+		return strings.HasPrefix(ns, before)
 	}
 	return pattern == ns
 }
@@ -31,7 +31,7 @@ func MatchAnyNamespace(patterns []string, ns string) bool {
 // in the "namespaces" field of API key Secrets (e.g. "tenant-a,tenant-*").
 func ParseNamespaces(s string) []string {
 	var out []string
-	for _, part := range strings.Split(s, ",") {
+	for part := range strings.SplitSeq(s, ",") {
 		part = strings.TrimSpace(part)
 		if part != "" {
 			out = append(out, part)

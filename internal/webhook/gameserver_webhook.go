@@ -30,16 +30,22 @@ func (v *GameServerValidator) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 func (v *GameServerValidator) ValidateCreate(ctx context.Context, server *operatorv1.GameServer) (admission.Warnings, error) {
 	gameserverlog.Info("validate create", "name", server.Name, "namespace", server.Namespace)
-	return v.validateGameServer(ctx, server)
+	return observeValidation("gameserver", "create", func() (admission.Warnings, error) {
+		return v.validateGameServer(ctx, server)
+	})
 }
 
 func (v *GameServerValidator) ValidateUpdate(ctx context.Context, oldServer, newServer *operatorv1.GameServer) (admission.Warnings, error) {
 	gameserverlog.Info("validate update", "name", newServer.Name, "namespace", newServer.Namespace)
-	return v.validateGameServer(ctx, newServer)
+	return observeValidation("gameserver", "update", func() (admission.Warnings, error) {
+		return v.validateGameServer(ctx, newServer)
+	})
 }
 
 func (v *GameServerValidator) ValidateDelete(ctx context.Context, server *operatorv1.GameServer) (admission.Warnings, error) {
-	return nil, nil
+	return observeValidation("gameserver", "delete", func() (admission.Warnings, error) {
+		return nil, nil
+	})
 }
 
 func (v *GameServerValidator) validateGameServer(ctx context.Context, server *operatorv1.GameServer) (admission.Warnings, error) {

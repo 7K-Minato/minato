@@ -81,7 +81,7 @@ func runCloud(t *testing.T, args ...string) error {
 }
 
 // tenantsHandler serves GET /api/v1/me/tenants with a single tenant.
-func singleTenantHandler(w http.ResponseWriter, r *http.Request) {
+func singleTenantHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode([]map[string]any{
 		{"id": "t-1", "slug": "acme", "name": "Acme"},

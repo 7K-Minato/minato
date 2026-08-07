@@ -11,21 +11,21 @@ func TestCloudCatalogPlansSubscription(t *testing.T) {
 	useCloudEnv(t, cloudConfigWithKey("mk_bill"))
 	srv, reqs := newFakeCloud(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/api/v1/me/tenants":
+		switch r.URL.Path {
+		case "/api/v1/me/tenants":
 			_, _ = w.Write([]byte(singleTenantJSON))
-		case r.URL.Path == "/api/v1/tenants/t-1/catalog":
+		case "/api/v1/tenants/t-1/catalog":
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"name": "minecraft", "displayName": "Minecraft", "category": "sandbox",
 					"capabilities": []string{"backup"}, "regions": []string{"eu", "us"},
 					"tiers": []map[string]any{{"name": "small"}, {"name": "large"}}},
 			})
-		case r.URL.Path == "/api/v1/plans":
+		case "/api/v1/plans":
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"id": "pro", "display_name": "Pro", "max_servers": 5, "max_storage_gb": 100,
 					"isolation": "shared", "monthly_price_cents": 999},
 			})
-		case r.URL.Path == "/api/v1/tenants/t-1/subscription":
+		case "/api/v1/tenants/t-1/subscription":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"tenant_id": "t-1", "plan_id": "pro", "status": "active",
 			})

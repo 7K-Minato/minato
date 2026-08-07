@@ -40,7 +40,7 @@ func newTestIssuer(t *testing.T) *testIssuer {
 		})
 	})
 	mux.HandleFunc("/keys", func(w http.ResponseWriter, r *http.Request) {
-		n := base64.RawURLEncoding.EncodeToString(key.PublicKey.N.Bytes())
+		n := base64.RawURLEncoding.EncodeToString(key.N.Bytes())
 		e := base64.RawURLEncoding.EncodeToString([]byte{1, 0, 1}) // 65537
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"keys": []map[string]string{{

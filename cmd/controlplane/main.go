@@ -62,6 +62,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(metricsMiddleware)
 	// A global timeout breaks long-lived WebSocket connections and strips
 	// Hijacker support; skip it for the console route.
 	timeout := middleware.Timeout(30 * time.Second)
@@ -90,6 +91,12 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	metricsAddr := os.Getenv("METRICS_ADDR")
+	if metricsAddr == "" {
+		metricsAddr = ":9090"
+	}
+	startMetricsServer(context.Background(), metricsAddr)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
@@ -193,7 +200,7 @@ func (api *controlPlaneAPI) ListGameServers(w http.ResponseWriter, r *http.Reque
 
 func (api *controlPlaneAPI) GetGameServer(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
 	server := &operatorv1.GameServer{}
-	if err := api.client.Get(r.Context(), types.NamespacedName{Name: string(name), Namespace: string(namespace)}, server); err != nil {
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: name, Namespace: namespace}, server); err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
@@ -225,7 +232,7 @@ func (api *controlPlaneAPI) CreateGameServer(w http.ResponseWriter, r *http.Requ
 }
 
 func (api *controlPlaneAPI) DeleteGameServer(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
-	server := &operatorv1.GameServer{ObjectMeta: metav1.ObjectMeta{Name: string(name), Namespace: string(namespace)}}
+	server := &operatorv1.GameServer{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
 	if err := api.client.Delete(r.Context(), server); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -264,7 +271,7 @@ func (api *controlPlaneAPI) UpdateGameServerLifecycle(w http.ResponseWriter, r *
 	}
 
 	server := &operatorv1.GameServer{}
-	if err := api.client.Get(r.Context(), types.NamespacedName{Name: string(name), Namespace: string(namespace)}, server); err != nil {
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: name, Namespace: namespace}, server); err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
@@ -288,7 +295,7 @@ func (api *controlPlaneAPI) UpdateGameServerLifecycle(w http.ResponseWriter, r *
 // Console
 
 func (api *controlPlaneAPI) GetConsole(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
-	api.serveConsole(w, r, string(namespace), string(name))
+	api.serveConsole(w, r, namespace, name)
 }
 
 // SFTP
@@ -299,7 +306,7 @@ func (api *controlPlaneAPI) GetConsole(w http.ResponseWriter, r *http.Request, n
 // Secret. The audit middleware logs the request; credentials are never
 // logged.
 func (api *controlPlaneAPI) GetSFTPInfo(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
-	ns, serverName := string(namespace), string(name)
+	ns, serverName := namespace, name
 
 	server := &operatorv1.GameServer{}
 	if err := api.client.Get(r.Context(), types.NamespacedName{Name: serverName, Namespace: ns}, server); err != nil {
@@ -354,7 +361,7 @@ func (api *controlPlaneAPI) GetSFTPInfo(w http.ResponseWriter, r *http.Request, 
 
 func (api *controlPlaneAPI) ListActions(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
 	server := &operatorv1.GameServer{}
-	if err := api.client.Get(r.Context(), types.NamespacedName{Name: string(name), Namespace: string(namespace)}, server); err != nil {
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: name, Namespace: namespace}, server); err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
@@ -369,7 +376,7 @@ func (api *controlPlaneAPI) ListActions(w http.ResponseWriter, r *http.Request, 
 }
 
 func (api *controlPlaneAPI) ExecuteAction(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name, action string) {
-	ns, serverName := string(namespace), string(name)
+	ns, serverName := namespace, name
 
 	var params map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
@@ -411,9 +418,9 @@ func (api *controlPlaneAPI) ExecuteAction(w http.ResponseWriter, r *http.Request
 	respondJSON(w, http.StatusCreated, map[string]string{"name": exec.Name})
 }
 
-func (api *controlPlaneAPI) GetActionExecution(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, _ oapi.Name, executionId string) {
+func (api *controlPlaneAPI) GetActionExecution(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, _ oapi.Name, executionID string) {
 	exec := &operatorv1.ActionExecution{}
-	if err := api.client.Get(r.Context(), types.NamespacedName{Name: executionId, Namespace: string(namespace)}, exec); err != nil {
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: executionID, Namespace: namespace}, exec); err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
@@ -423,7 +430,7 @@ func (api *controlPlaneAPI) GetActionExecution(w http.ResponseWriter, r *http.Re
 // Snapshots
 
 func (api *controlPlaneAPI) ListSnapshots(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
-	ns, serverName := string(namespace), string(name)
+	ns, serverName := namespace, name
 
 	var list operatorv1.GameSnapshotList
 	if err := api.client.List(r.Context(), &list,
@@ -448,7 +455,7 @@ func (api *controlPlaneAPI) ListSnapshots(w http.ResponseWriter, r *http.Request
 }
 
 func (api *controlPlaneAPI) CreateSnapshot(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
-	ns, serverName := string(namespace), string(name)
+	ns, serverName := namespace, name
 
 	snap := &operatorv1.GameSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -488,7 +495,7 @@ func (api *controlPlaneAPI) ListGameServerFleets(w http.ResponseWriter, r *http.
 
 func (api *controlPlaneAPI) GetGameServerFleet(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
 	fleet := &operatorv1.GameServerFleet{}
-	if err := api.client.Get(r.Context(), types.NamespacedName{Name: string(name), Namespace: string(namespace)}, fleet); err != nil {
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: name, Namespace: namespace}, fleet); err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
@@ -558,7 +565,7 @@ func (api *controlPlaneAPI) UpdateGameServerFleet(w http.ResponseWriter, r *http
 	}
 
 	fleet := &operatorv1.GameServerFleet{}
-	if err := api.client.Get(r.Context(), types.NamespacedName{Name: string(name), Namespace: string(namespace)}, fleet); err != nil {
+	if err := api.client.Get(r.Context(), types.NamespacedName{Name: name, Namespace: namespace}, fleet); err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
@@ -574,13 +581,13 @@ func (api *controlPlaneAPI) UpdateGameServerFleet(w http.ResponseWriter, r *http
 }
 
 func (api *controlPlaneAPI) DeleteGameServerFleet(w http.ResponseWriter, r *http.Request, namespace oapi.Namespace, name oapi.Name) {
-	fleet := &operatorv1.GameServerFleet{ObjectMeta: metav1.ObjectMeta{Name: string(name), Namespace: string(namespace)}}
+	fleet := &operatorv1.GameServerFleet{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
 	if err := api.client.Delete(r.Context(), fleet); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	audit.LogAction("gameserverfleet.deleted", string(name), auth.GetUser(r.Context()))
+	audit.LogAction("gameserverfleet.deleted", name, auth.GetUser(r.Context()))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -671,13 +678,13 @@ func (api *controlPlaneAPI) CreateAPIKey(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func (api *controlPlaneAPI) DeleteAPIKey(w http.ResponseWriter, r *http.Request, keyId string) {
-	if err := api.keyStorage.DeleteKey(r.Context(), keyId); err != nil {
+func (api *controlPlaneAPI) DeleteAPIKey(w http.ResponseWriter, r *http.Request, keyID string) {
+	if err := api.keyStorage.DeleteKey(r.Context(), keyID); err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
 
-	audit.LogAction("apikey.deleted", keyId, auth.GetUser(r.Context()))
+	audit.LogAction("apikey.deleted", keyID, auth.GetUser(r.Context()))
 
 	w.WriteHeader(http.StatusNoContent)
 }

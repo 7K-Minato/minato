@@ -33,6 +33,51 @@ func findContainer(podSpec corev1.PodSpec, name string) *corev1.Container {
 	return nil
 }
 
+// assertSFTPVolumeMounts verifies the data PVC, credentials and config mounts.
+func assertSFTPVolumeMounts(t *testing.T, volumeMounts []corev1.VolumeMount) {
+	t.Helper()
+	mounts := map[string]corev1.VolumeMount{}
+	for _, m := range volumeMounts {
+		mounts[m.Name] = m
+	}
+	if m, ok := mounts[DataVolumeName]; !ok || m.MountPath != "/data" {
+		t.Fatalf("expected data volume mounted at /data, got %#v", volumeMounts)
+	}
+	if m, ok := mounts[sftpCredentialsVolumeName]; !ok || !m.ReadOnly {
+		t.Fatalf("expected read-only credentials mount, got %#v", volumeMounts)
+	}
+	if _, ok := mounts[sftpConfigVolumeName]; !ok {
+		t.Fatalf("expected config volume mount, got %#v", volumeMounts)
+	}
+}
+
+// assertSFTPPSSRestricted verifies the sidecar satisfies the PSS restricted
+// baseline (non-root, no privilege escalation, drop ALL, seccomp, RO rootfs).
+func assertSFTPPSSRestricted(t *testing.T, sc *corev1.SecurityContext) {
+	t.Helper()
+	if sc == nil {
+		t.Fatal("expected securityContext on sftp sidecar")
+	}
+	if sc.RunAsNonRoot == nil || !*sc.RunAsNonRoot {
+		t.Fatal("expected runAsNonRoot=true")
+	}
+	if sc.RunAsUser == nil || *sc.RunAsUser == 0 {
+		t.Fatal("expected non-zero runAsUser")
+	}
+	if sc.AllowPrivilegeEscalation == nil || *sc.AllowPrivilegeEscalation {
+		t.Fatal("expected allowPrivilegeEscalation=false")
+	}
+	if sc.Capabilities == nil || len(sc.Capabilities.Drop) != 1 || sc.Capabilities.Drop[0] != "ALL" {
+		t.Fatalf("expected capabilities drop ALL, got %#v", sc.Capabilities)
+	}
+	if sc.SeccompProfile == nil || sc.SeccompProfile.Type != corev1.SeccompProfileTypeRuntimeDefault {
+		t.Fatal("expected seccompProfile RuntimeDefault")
+	}
+	if sc.ReadOnlyRootFilesystem == nil || !*sc.ReadOnlyRootFilesystem {
+		t.Fatal("expected readOnlyRootFilesystem=true")
+	}
+}
+
 func TestSFTPSidecarInjectedWhenCapabilityEnabled(t *testing.T) {
 	server := &operatorv1.GameServer{ObjectMeta: metav1.ObjectMeta{Name: "srv", Namespace: "default"}}
 
@@ -55,19 +100,7 @@ func TestSFTPSidecarInjectedWhenCapabilityEnabled(t *testing.T) {
 	}
 
 	// Mounts: same data PVC at the profile mountPath, plus credentials and config volumes.
-	mounts := map[string]corev1.VolumeMount{}
-	for _, m := range sftp.VolumeMounts {
-		mounts[m.Name] = m
-	}
-	if m, ok := mounts[DataVolumeName]; !ok || m.MountPath != "/data" {
-		t.Fatalf("expected data volume mounted at /data, got %#v", sftp.VolumeMounts)
-	}
-	if m, ok := mounts[sftpCredentialsVolumeName]; !ok || !m.ReadOnly {
-		t.Fatalf("expected read-only credentials mount, got %#v", sftp.VolumeMounts)
-	}
-	if _, ok := mounts[sftpConfigVolumeName]; !ok {
-		t.Fatalf("expected config volume mount, got %#v", sftp.VolumeMounts)
-	}
+	assertSFTPVolumeMounts(t, sftp.VolumeMounts)
 
 	// Credentials: the pre-hashed users dump is mounted from the secret and
 	// preloaded via --loaddata-from.
@@ -80,28 +113,7 @@ func TestSFTPSidecarInjectedWhenCapabilityEnabled(t *testing.T) {
 	}
 
 	// PSS restricted compliance.
-	sc := sftp.SecurityContext
-	if sc == nil {
-		t.Fatal("expected securityContext on sftp sidecar")
-	}
-	if sc.RunAsNonRoot == nil || !*sc.RunAsNonRoot {
-		t.Fatal("expected runAsNonRoot=true")
-	}
-	if sc.RunAsUser == nil || *sc.RunAsUser == 0 {
-		t.Fatal("expected non-zero runAsUser")
-	}
-	if sc.AllowPrivilegeEscalation == nil || *sc.AllowPrivilegeEscalation {
-		t.Fatal("expected allowPrivilegeEscalation=false")
-	}
-	if sc.Capabilities == nil || len(sc.Capabilities.Drop) != 1 || sc.Capabilities.Drop[0] != "ALL" {
-		t.Fatalf("expected capabilities drop ALL, got %#v", sc.Capabilities)
-	}
-	if sc.SeccompProfile == nil || sc.SeccompProfile.Type != corev1.SeccompProfileTypeRuntimeDefault {
-		t.Fatal("expected seccompProfile RuntimeDefault")
-	}
-	if sc.ReadOnlyRootFilesystem == nil || !*sc.ReadOnlyRootFilesystem {
-		t.Fatal("expected readOnlyRootFilesystem=true")
-	}
+	assertSFTPPSSRestricted(t, sftp.SecurityContext)
 
 	// Volumes: credentials secret (users.json only) and writable config emptyDir.
 	volumes := map[string]corev1.Volume{}

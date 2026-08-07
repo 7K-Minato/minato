@@ -78,7 +78,7 @@ func TestGameServerReconciler_Reconcile_AutoStartFalse_StopsServer(t *testing.T)
 	profile := newTestProfile()
 	server := newTestGameServer()
 	server.Finalizers = []string{gameServerFinalizer}
-	server.Spec.Lifecycle.AutoStart = ptr.To(false)
+	server.Spec.Lifecycle.AutoStart = new(false)
 
 	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: server.Name, Namespace: ns},
@@ -121,7 +121,7 @@ func TestGameServerReconciler_Reconcile_AutoStartFalse_ShutdownFailureStillStops
 	profile := newTestProfile()
 	server := newTestGameServer()
 	server.Finalizers = []string{gameServerFinalizer}
-	server.Spec.Lifecycle.AutoStart = ptr.To(false)
+	server.Spec.Lifecycle.AutoStart = new(false)
 
 	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: server.Name, Namespace: ns},
@@ -156,7 +156,7 @@ func TestGameServerReconciler_Reconcile_AutoStartTrue_StartsStoppedServer(t *tes
 	profile := newTestProfile()
 	server := newTestGameServer()
 	server.Finalizers = []string{gameServerFinalizer}
-	server.Spec.Lifecycle.AutoStart = ptr.To(true)
+	server.Spec.Lifecycle.AutoStart = new(true)
 
 	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: server.Name, Namespace: ns},

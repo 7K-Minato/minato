@@ -24,7 +24,7 @@ func fakeRCONServer(t *testing.T, password string) (addr string, commands chan s
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		for {
 			var length int32
 			if err := binary.Read(conn, binary.LittleEndian, &length); err != nil {
@@ -75,7 +75,7 @@ func TestMinecraftRCONAuthAndCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("auth with correct password: %v", err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	out, err := c.Command(context.Background(), "list")
 	if err != nil || out != "ok" {

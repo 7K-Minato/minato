@@ -87,12 +87,12 @@ func TestHeartbeatUnknownCluster(t *testing.T) {
 func TestRunRegistersThenHeartbeats(t *testing.T) {
 	var registers, beats atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/v1/clusters/register":
+		switch r.URL.Path {
+		case "/api/v1/clusters/register":
 			registers.Add(1)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": "clu_1"})
-		case r.URL.Path == "/api/v1/clusters/eu-1/heartbeat":
+		case "/api/v1/clusters/eu-1/heartbeat":
 			beats.Add(1)
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -117,12 +117,12 @@ func TestRunRegistersThenHeartbeats(t *testing.T) {
 func TestRunReregistersOn404(t *testing.T) {
 	var registers, beats atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/v1/clusters/register":
+		switch r.URL.Path {
+		case "/api/v1/clusters/register":
 			registers.Add(1)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": "clu_1"})
-		case r.URL.Path == "/api/v1/clusters/eu-1/heartbeat":
+		case "/api/v1/clusters/eu-1/heartbeat":
 			if beats.Add(1) == 1 {
 				w.WriteHeader(http.StatusNotFound) // cloud forgot us once
 				return

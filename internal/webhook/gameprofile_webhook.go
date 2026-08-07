@@ -29,16 +29,22 @@ func (v *GameProfileValidator) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 func (v *GameProfileValidator) ValidateCreate(ctx context.Context, profile *operatorv1.GameProfile) (admission.Warnings, error) {
 	gameprofilelog.Info("validate create", "name", profile.Name)
-	return v.validateGameProfile(profile)
+	return observeValidation("gameprofile", "create", func() (admission.Warnings, error) {
+		return v.validateGameProfile(profile)
+	})
 }
 
 func (v *GameProfileValidator) ValidateUpdate(ctx context.Context, oldProfile, newProfile *operatorv1.GameProfile) (admission.Warnings, error) {
 	gameprofilelog.Info("validate update", "name", newProfile.Name)
-	return v.validateGameProfile(newProfile)
+	return observeValidation("gameprofile", "update", func() (admission.Warnings, error) {
+		return v.validateGameProfile(newProfile)
+	})
 }
 
 func (v *GameProfileValidator) ValidateDelete(ctx context.Context, profile *operatorv1.GameProfile) (admission.Warnings, error) {
-	return nil, nil
+	return observeValidation("gameprofile", "delete", func() (admission.Warnings, error) {
+		return nil, nil
+	})
 }
 
 func (v *GameProfileValidator) validateGameProfile(profile *operatorv1.GameProfile) (admission.Warnings, error) {

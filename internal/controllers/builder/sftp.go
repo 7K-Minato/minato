@@ -68,7 +68,7 @@ func SFTPUsersJSON(mountPath, passwordHash string) string {
 // buildSFTPContainer builds the PSS-restricted compliant SFTPGo sidecar. It
 // mounts the same world PVC as the game container at the profile's
 // storage.mountPath and serves SFTP on port 2022.
-func buildSFTPContainer(profile *operatorv1.GameProfile, server *operatorv1.GameServer) corev1.Container {
+func buildSFTPContainer(profile *operatorv1.GameProfile) corev1.Container {
 	return corev1.Container{
 		Name:  SFTPContainerName,
 		Image: SFTPImage,
@@ -107,11 +107,11 @@ func buildSFTPContainer(profile *operatorv1.GameProfile, server *operatorv1.Game
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
-			RunAsNonRoot:             ptr.To(true),
+			RunAsNonRoot:             new(true),
 			RunAsUser:                ptr.To[int64](1000),
 			RunAsGroup:               ptr.To[int64](1000),
-			AllowPrivilegeEscalation: ptr.To(false),
-			ReadOnlyRootFilesystem:   ptr.To(true),
+			AllowPrivilegeEscalation: new(false),
+			ReadOnlyRootFilesystem:   new(true),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},
@@ -134,7 +134,7 @@ func buildSFTPContainer(profile *operatorv1.GameProfile, server *operatorv1.Game
 // fsGroup settings (so the non-root sidecar can write its config dir and
 // access the world volume) into the pod spec.
 func applySFTPSidecar(podSpec *corev1.PodSpec, profile *operatorv1.GameProfile, server *operatorv1.GameServer) {
-	podSpec.Containers = append(podSpec.Containers, buildSFTPContainer(profile, server))
+	podSpec.Containers = append(podSpec.Containers, buildSFTPContainer(profile))
 	podSpec.Volumes = append(podSpec.Volumes,
 		corev1.Volume{
 			Name: sftpCredentialsVolumeName,

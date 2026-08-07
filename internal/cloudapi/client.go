@@ -87,7 +87,9 @@ func apiError(status int, body []byte) error {
 
 // Tenants
 
-func (c *Client) ListMyTenants(ctx context.Context) ([]Tenant, error) {
+func (c *Client) ListMyTenants(ctx context.Context) (_ []Tenant, err error) {
+	start := time.Now()
+	defer func() { observeRequest("ListMyTenants", start, err) }()
 	resp, err := c.inner.ListMyTenantsWithResponse(ctx)
 	if err != nil {
 		return nil, err
@@ -134,7 +136,9 @@ func (c *Client) ResolveTenant(ctx context.Context, ref string) (*Tenant, error)
 
 // Servers
 
-func (c *Client) ListServers(ctx context.Context, tenantID string) ([]Server, error) {
+func (c *Client) ListServers(ctx context.Context, tenantID string) (_ []Server, err error) {
+	start := time.Now()
+	defer func() { observeRequest("ListServers", start, err) }()
 	resp, err := c.inner.ListServersWithResponse(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -148,7 +152,9 @@ func (c *Client) ListServers(ctx context.Context, tenantID string) ([]Server, er
 	return *resp.JSON200, nil
 }
 
-func (c *Client) GetServer(ctx context.Context, tenantID, serverID string) (*ServerWithLive, error) {
+func (c *Client) GetServer(ctx context.Context, tenantID, serverID string) (_ *ServerWithLive, err error) {
+	start := time.Now()
+	defer func() { observeRequest("GetServer", start, err) }()
 	resp, err := c.inner.GetServerWithResponse(ctx, tenantID, serverID)
 	if err != nil {
 		return nil, err
@@ -159,7 +165,9 @@ func (c *Client) GetServer(ctx context.Context, tenantID, serverID string) (*Ser
 	return resp.JSON200, nil
 }
 
-func (c *Client) CreateServer(ctx context.Context, tenantID string, req CreateServerRequest) (*Server, error) {
+func (c *Client) CreateServer(ctx context.Context, tenantID string, req CreateServerRequest) (_ *Server, err error) {
+	start := time.Now()
+	defer func() { observeRequest("CreateServer", start, err) }()
 	resp, err := c.inner.CreateServerWithResponse(ctx, tenantID, req)
 	if err != nil {
 		return nil, err
@@ -170,7 +178,9 @@ func (c *Client) CreateServer(ctx context.Context, tenantID string, req CreateSe
 	return resp.JSON201, nil
 }
 
-func (c *Client) DeleteServer(ctx context.Context, tenantID, serverID string) error {
+func (c *Client) DeleteServer(ctx context.Context, tenantID, serverID string) (err error) {
+	start := time.Now()
+	defer func() { observeRequest("DeleteServer", start, err) }()
 	resp, err := c.inner.DeleteServerWithResponse(ctx, tenantID, serverID)
 	if err != nil {
 		return err
@@ -183,7 +193,9 @@ func (c *Client) DeleteServer(ctx context.Context, tenantID, serverID string) er
 
 // Snapshots
 
-func (c *Client) ListSnapshots(ctx context.Context, tenantID, serverID string) ([]GameSnapshot, error) {
+func (c *Client) ListSnapshots(ctx context.Context, tenantID, serverID string) (_ []GameSnapshot, err error) {
+	start := time.Now()
+	defer func() { observeRequest("ListSnapshots", start, err) }()
 	resp, err := c.inner.ListSnapshotsWithResponse(ctx, tenantID, serverID)
 	if err != nil {
 		return nil, err
@@ -197,7 +209,9 @@ func (c *Client) ListSnapshots(ctx context.Context, tenantID, serverID string) (
 	return *resp.JSON200, nil
 }
 
-func (c *Client) CreateSnapshot(ctx context.Context, tenantID, serverID string) (*GameSnapshot, error) {
+func (c *Client) CreateSnapshot(ctx context.Context, tenantID, serverID string) (_ *GameSnapshot, err error) {
+	start := time.Now()
+	defer func() { observeRequest("CreateSnapshot", start, err) }()
 	resp, err := c.inner.CreateSnapshotWithResponse(ctx, tenantID, serverID)
 	if err != nil {
 		return nil, err
@@ -210,7 +224,9 @@ func (c *Client) CreateSnapshot(ctx context.Context, tenantID, serverID string) 
 
 // Actions
 
-func (c *Client) ListActions(ctx context.Context, tenantID, serverID string) ([]Action, error) {
+func (c *Client) ListActions(ctx context.Context, tenantID, serverID string) (_ []Action, err error) {
+	start := time.Now()
+	defer func() { observeRequest("ListActions", start, err) }()
 	resp, err := c.inner.ListActionsWithResponse(ctx, tenantID, serverID)
 	if err != nil {
 		return nil, err
@@ -224,7 +240,9 @@ func (c *Client) ListActions(ctx context.Context, tenantID, serverID string) ([]
 	return *resp.JSON200, nil
 }
 
-func (c *Client) ExecuteAction(ctx context.Context, tenantID, serverID, action string, params map[string]string) (*ActionExecutionRef, error) {
+func (c *Client) ExecuteAction(ctx context.Context, tenantID, serverID, action string, params map[string]string) (_ *ActionExecutionRef, err error) {
+	start := time.Now()
+	defer func() { observeRequest("ExecuteAction", start, err) }()
 	resp, err := c.inner.ExecuteActionWithResponse(ctx, tenantID, serverID, action, params)
 	if err != nil {
 		return nil, err
@@ -237,7 +255,9 @@ func (c *Client) ExecuteAction(ctx context.Context, tenantID, serverID, action s
 
 // Catalog, plans, billing
 
-func (c *Client) GetCatalog(ctx context.Context, tenantID string) ([]CatalogEntry, error) {
+func (c *Client) GetCatalog(ctx context.Context, tenantID string) (_ []CatalogEntry, err error) {
+	start := time.Now()
+	defer func() { observeRequest("GetCatalog", start, err) }()
 	resp, err := c.inner.GetCatalogWithResponse(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -251,7 +271,9 @@ func (c *Client) GetCatalog(ctx context.Context, tenantID string) ([]CatalogEntr
 	return *resp.JSON200, nil
 }
 
-func (c *Client) ListPlans(ctx context.Context) ([]Plan, error) {
+func (c *Client) ListPlans(ctx context.Context) (_ []Plan, err error) {
+	start := time.Now()
+	defer func() { observeRequest("ListPlans", start, err) }()
 	resp, err := c.inner.ListPlansWithResponse(ctx)
 	if err != nil {
 		return nil, err
@@ -265,7 +287,9 @@ func (c *Client) ListPlans(ctx context.Context) ([]Plan, error) {
 	return *resp.JSON200, nil
 }
 
-func (c *Client) GetSubscription(ctx context.Context, tenantID string) (*Subscription, error) {
+func (c *Client) GetSubscription(ctx context.Context, tenantID string) (_ *Subscription, err error) {
+	start := time.Now()
+	defer func() { observeRequest("GetSubscription", start, err) }()
 	resp, err := c.inner.GetSubscriptionWithResponse(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -278,7 +302,9 @@ func (c *Client) GetSubscription(ctx context.Context, tenantID string) (*Subscri
 
 // API keys
 
-func (c *Client) ListAPIKeys(ctx context.Context, tenantID string) ([]APIKey, error) {
+func (c *Client) ListAPIKeys(ctx context.Context, tenantID string) (_ []APIKey, err error) {
+	start := time.Now()
+	defer func() { observeRequest("ListAPIKeys", start, err) }()
 	resp, err := c.inner.ListAPIKeysWithResponse(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -292,7 +318,9 @@ func (c *Client) ListAPIKeys(ctx context.Context, tenantID string) ([]APIKey, er
 	return *resp.JSON200, nil
 }
 
-func (c *Client) CreateAPIKey(ctx context.Context, tenantID string, req CreateAPIKeyRequest) (*APIKeyCreated, error) {
+func (c *Client) CreateAPIKey(ctx context.Context, tenantID string, req CreateAPIKeyRequest) (_ *APIKeyCreated, err error) {
+	start := time.Now()
+	defer func() { observeRequest("CreateAPIKey", start, err) }()
 	resp, err := c.inner.CreateAPIKeyWithResponse(ctx, tenantID, req)
 	if err != nil {
 		return nil, err
@@ -303,7 +331,9 @@ func (c *Client) CreateAPIKey(ctx context.Context, tenantID string, req CreateAP
 	return resp.JSON201, nil
 }
 
-func (c *Client) DeleteAPIKey(ctx context.Context, tenantID, keyID string) error {
+func (c *Client) DeleteAPIKey(ctx context.Context, tenantID, keyID string) (err error) {
+	start := time.Now()
+	defer func() { observeRequest("DeleteAPIKey", start, err) }()
 	resp, err := c.inner.DeleteAPIKeyWithResponse(ctx, tenantID, keyID)
 	if err != nil {
 		return err

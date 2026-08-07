@@ -67,7 +67,7 @@ func newTestGameServer() *operatorv1.GameServer {
 			Profile: "mc",
 			Lifecycle: operatorv1.LifecycleSpec{
 				IdleTimeoutSeconds: 0,
-				AutoStart:          ptr.To(true),
+				AutoStart:          new(true),
 			},
 		},
 	}
@@ -487,7 +487,7 @@ func TestBuildGameService(t *testing.T) {
 		operatorv1.PortSpec{Name: "game-dup", ContainerPort: 25565, Protocol: corev1.ProtocolTCP},
 	)
 	svc = buildGameService(server, profile, labels, "")
-	names := []string{}
+	names := make([]string, 0, len(svc.Spec.Ports))
 	for _, p := range svc.Spec.Ports {
 		names = append(names, p.Name)
 	}

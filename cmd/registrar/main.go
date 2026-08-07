@@ -20,17 +20,20 @@ import (
 )
 
 type config struct {
-	CloudURL           string
-	RegisterToken      string
-	Name               string
-	Region             string
-	ControlPlaneURL    string
-	ControlPlaneKey    string
-	CapacityMax        int
-	DedicatedTenantID  string
-	ClusterFingerprint string
-	HeartbeatInterval  time.Duration
-	RequestTimeout     time.Duration
+	CloudURL            string
+	RegisterToken       string
+	Name                string
+	Region              string
+	ControlPlaneURL     string
+	ControlPlaneKey     string
+	CapacityMax         int
+	DedicatedTenantID   string
+	ClusterFingerprint  string
+	HeartbeatInterval   time.Duration
+	RequestTimeout      time.Duration
+	MetricsAddr         string
+	MetricsPushEnabled  bool
+	MetricsPushInterval time.Duration
 }
 
 func loadConfig() (config, error) {
@@ -46,6 +49,9 @@ func loadConfig() (config, error) {
 	c.CapacityMax = envInt("CAPACITY_MAX", 100)
 	c.HeartbeatInterval = envDuration("HEARTBEAT_INTERVAL", 30*time.Second)
 	c.RequestTimeout = envDuration("REQUEST_TIMEOUT", 10*time.Second)
+	c.MetricsAddr = envStr("METRICS_ADDR", ":9091")
+	c.MetricsPushEnabled = envStr("METRICS_PUSH_ENABLED", "true") != "false"
+	c.MetricsPushInterval = envDuration("METRICS_PUSH_INTERVAL", 30*time.Second)
 
 	if c.CloudURL == "" || c.RegisterToken == "" || c.Name == "" || c.ControlPlaneKey == "" {
 		return c, fmt.Errorf("CLOUD_URL, REGISTER_TOKEN, CLUSTER_NAME and CONTROLPLANE_API_KEY are required")
@@ -127,7 +133,7 @@ func (r *registrar) call(ctx context.Context, path string, body any) (int, []byt
 	if err != nil {
 		return 0, nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	return resp.StatusCode, respBody, nil
 }
@@ -190,8 +196,10 @@ func (r *registrar) run(ctx context.Context) {
 		cancel()
 		switch {
 		case err != nil:
+			heartbeatsTotal.WithLabelValues("error").Inc()
 			log.Printf("heartbeat failed: %v", err)
 		case !ok:
+			heartbeatsTotal.WithLabelValues("reregister").Inc()
 			log.Printf("cluster unknown to cloud, re-registering")
 			if err := r.register(ctx); err != nil {
 				log.Printf("re-register failed: %v", err)
@@ -199,6 +207,7 @@ func (r *registrar) run(ctx context.Context) {
 				log.Printf("cluster %q re-registered", r.cfg.Name)
 			}
 		default:
+			heartbeatsTotal.WithLabelValues("ok").Inc()
 			log.Printf("heartbeat ok")
 		}
 	}
@@ -219,5 +228,9 @@ func main() {
 	}
 
 	r := &registrar{cfg: cfg, fingerprint: fingerprint, client: &http.Client{Timeout: cfg.RequestTimeout}}
+	startMetricsServer(ctx, cfg.MetricsAddr)
+	if cfg.MetricsPushEnabled {
+		go r.runMetricsPush(ctx)
+	}
 	r.run(ctx)
 }

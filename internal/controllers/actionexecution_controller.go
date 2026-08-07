@@ -40,7 +40,9 @@ type ActionExecutionReconciler struct {
 // +kubebuilder:rbac:groups=operator.minato.io,resources=gameprofiles,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch
 
-func (r *ActionExecutionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ActionExecutionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+	start := time.Now()
+	defer func() { observeReconcile("actionexecution", start, err) }()
 	logger := log.FromContext(ctx)
 
 	exec := &operatorv1.ActionExecution{}
