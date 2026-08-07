@@ -76,15 +76,15 @@ spec:
         summary: "Fleet replicas mismatch"
         description: "Fleet {{ "{{" }} $labels.fleet {{ "}}" }} in namespace {{ "{{" }} $labels.namespace {{ "}}" }} has desired != ready replicas for more than 15 minutes."
 
-    - alert: MinatoWebhookErrorRate
+    - alert: MinatoWebhookDeniedRate
       expr: |
-        sum(rate(minato_webhook_requests_total{result="error"}[5m])) / sum(rate(minato_webhook_requests_total[5m])) > 0.05
+        sum(rate(minato_webhook_requests_total{result="denied"}[5m])) / sum(rate(minato_webhook_requests_total[5m])) > 0.05
       for: 10m
       labels:
         severity: warning
       annotations:
-        summary: "Admission webhook error rate"
-        description: "More than 5% of webhook requests are failing over the last 10 minutes (webhook {{ "{{" }} $labels.webhook {{ "}}" }})."
+        summary: "Admission webhook denied rate"
+        description: "More than 5% of webhook requests are being denied over the last 10 minutes (webhook {{ "{{" }} $labels.webhook {{ "}}" }})."
 
     - alert: MinatoRegistrarHeartbeatFailures
       expr: |
