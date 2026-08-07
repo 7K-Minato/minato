@@ -51,6 +51,82 @@
           }
         ],
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Reconcile Duration p95",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(minato_reconcile_duration_seconds_bucket[5m])) by (le, controller))",
+            "legendFormat": "{{controller}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Reconcile Errors",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(minato_reconcile_errors_total[5m])",
+            "legendFormat": "{{controller}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Fleet Replicas (desired vs ready)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "minato_fleet_replicas",
+            "legendFormat": "{{namespace}}/{{fleet}} {{kind}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Webhook Requests",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(minato_webhook_requests_total[5m])",
+            "legendFormat": "{{webhook}} {{operation}} {{result}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "Control Plane Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(minato_controlplane_http_requests_total[5m])) by (route, status)",
+            "legendFormat": "{{route}} {{status}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+      },
+      {
+        "id": 10,
+        "title": "Registrar Health",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(minato_registrar_heartbeats_total[5m])",
+            "legendFormat": "heartbeats {{result}}"
+          },
+          {
+            "expr": "rate(minato_registrar_metrics_push_total[5m])",
+            "legendFormat": "metrics push {{result}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
       }
     ],
     "time": {

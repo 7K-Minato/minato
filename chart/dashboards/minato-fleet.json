@@ -12,6 +12,30 @@
           "content": "Fleet dashboard will be available after Milestone 7 (GameServerFleet implementation)."
         },
         "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Fleet Replicas",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "minato_fleet_replicas",
+            "legendFormat": "{{namespace}}/{{fleet}} {{kind}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 3,
+        "title": "Fleet Reconcile Errors",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(minato_reconcile_errors_total{controller=~\".*fleet.*|.*Fleet.*\"}[5m])",
+            "legendFormat": "{{controller}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
       }
     ],
     "time": {

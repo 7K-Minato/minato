@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Chart
+
+- Consolidated monitoring configuration under `monitoring.*`:
+  `monitoring.serviceMonitor`, `monitoring.prometheusRule`, and
+  `monitoring.grafana.dashboards`. The top-level `grafana.*` block is
+  **deprecated** and kept as a fallback for one release; `monitoring.*`
+  wins when both are set.
+- Added `operator.metrics.secure` (default `true`, preserves previous
+  behavior of serving operator metrics over HTTPS via controller-runtime).
+  When secure, the rendered ServiceMonitor uses `scheme: https` with
+  `tlsConfig.insecureSkipVerify`; set `secure: false` for plain-HTTP scraping.
+- Added ServiceMonitors for the control plane (`/metrics` on port 9090) and
+  the registrar (`/metrics` on port 9091, new `minato-*-registrar-metrics`
+  Service).
+- Added `registrar.metricsPush.{enabled,interval}` (default `true` / `30s`),
+  wired to `METRICS_PUSH_ENABLED`/`METRICS_PUSH_INTERVAL`.
+- New alert rules: reconcile error rate, fleet replicas mismatch, webhook
+  error rate, registrar heartbeat failures, registrar metrics push failures,
+  control plane 5xx rate and p95 latency.
+- Refreshed Grafana dashboards with panels for reconcile duration/errors,
+  fleet replicas, webhook requests/latency, control plane request rate and
+  registrar health.
+- CI: the helm path filter now matches `chart/**` (previously the
+  nonexistent `deploy/helm/**`, so helm-check never ran).
+
 ## [1.3.0](https://github.com/7K-Minato/minato/compare/v1.2.1...v1.3.0) (2026-08-06)
 
 

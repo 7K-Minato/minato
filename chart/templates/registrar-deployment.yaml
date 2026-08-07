@@ -50,6 +50,12 @@ spec:
               value: {{ .Values.registrar.capacityMax | quote }}
             - name: HEARTBEAT_INTERVAL
               value: {{ .Values.registrar.heartbeatInterval | quote }}
+            - name: METRICS_ADDR
+              value: ":{{ .Values.registrar.metrics.port }}"
+            - name: METRICS_PUSH_ENABLED
+              value: {{ .Values.registrar.metricsPush.enabled | quote }}
+            - name: METRICS_PUSH_INTERVAL
+              value: {{ .Values.registrar.metricsPush.interval | quote }}
             - name: CONTROLPLANE_URL
               value: {{ .Values.registrar.controlplaneUrl | default (printf "http://%s-controlplane:%v" (include "minato.fullname" .) .Values.controlPlane.service.port) | quote }}
             - name: DEDICATED_TENANT_ID
@@ -68,6 +74,29 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.registrar.controlplaneKeySecret.name }}
                   key: {{ .Values.registrar.controlplaneKeySecret.key }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.registrar.metrics.port }}
+              protocol: TCP
           resources:
             {{- toYaml .Values.registrar.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "minato.fullname" . }}-registrar-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    app.kubernetes.io/component: registrar
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.registrar.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "minato.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: registrar
 {{- end }}

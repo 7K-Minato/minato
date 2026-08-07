@@ -63,6 +63,7 @@ spec:
             {{- end }}
             - --health-probe-bind-address=:{{ .Values.operator.health.port }}
             - --metrics-bind-address=:{{ .Values.operator.metrics.port }}
+            - --metrics-secure={{ .Values.operator.metrics.secure }}
             {{- if not .Values.webhook.enabled }}
             - --disable-webhooks
             {{- end }}

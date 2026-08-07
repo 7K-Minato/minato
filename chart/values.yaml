@@ -65,6 +65,11 @@ operator:
   metrics:
     enabled: true
     port: 8080
+    # secure=true serves /metrics over HTTPS with authn/authz via
+    # controller-runtime (default, preserves previous behavior). When secure,
+    # a ServiceMonitor scrape needs matching TLS config (the chart renders
+    # scheme https + insecureSkipVerify), or set secure=false for plain HTTP.
+    secure: true
     service:
       type: ClusterIP
       annotations: {}
@@ -108,6 +113,11 @@ controlPlane:
     type: ClusterIP
     port: 8080
     annotations: {}
+
+  # The control plane serves /metrics (plain HTTP, no auth) on a separate
+  # listener; scraped via monitoring.serviceMonitor when enabled.
+  metrics:
+    port: 9090
   
   env:
 
@@ -160,7 +170,6 @@ rbac:
 
 # Monitoring configuration (Prometheus Operator)
 monitoring:
-  enabled: false
   serviceMonitor:
     enabled: false
     interval: 30s
@@ -171,9 +180,21 @@ monitoring:
   prometheusRule:
     enabled: false
     labels: {}
+  grafana:
+    # dashboards are rendered as ConfigMaps picked up by the Grafana
+    # dashboard sidecar (grafana-sc-dashboard).
+    dashboards:
+      enabled: false
+      labels: {}
+      # sidecar label configuration (kept under the legacy grafana.sidecar
+      # block below; override there if your sidecar uses different labels).
+      dashboardLabel: ""
+      dashboardLabelValue: ""
+      dashboardFolder: ""
 
-# Grafana sidecar configuration
-# Requires Grafana with the dashboard sidecar enabled (grafana-sc-dashboard).
+# DEPRECATED: top-level grafana.* is kept for one release as a fallback.
+# Use monitoring.grafana.dashboards.enabled and monitoring.prometheusRule.*
+# instead. If both are set, monitoring.* wins.
 grafana:
   enabled: false
   dashboards:
@@ -252,6 +273,13 @@ registrar:
   # clusterFingerprint overrides the auto-detected cluster fingerprint (kube-system
   # namespace UID) sent during registration and heartbeats. Leave empty to auto-detect.
   clusterFingerprint: ""
+  # The registrar serves /metrics (plain HTTP) on a separate listener.
+  metrics:
+    port: 9091
+  # metricsPush pushes GameServer summaries to the minato cloud API.
+  metricsPush:
+    enabled: true
+    interval: 30s
   # Secrets holding the cloud registration token and the control plane API key.
   registerTokenSecret:
     name: minato-registrar

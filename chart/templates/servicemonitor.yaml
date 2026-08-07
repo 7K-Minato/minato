@@ -1,4 +1,5 @@
-{{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled .Values.operator.enabled }}
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+{{- if .Values.operator.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -18,6 +19,13 @@ spec:
     - port: metrics
       path: /metrics
       interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      {{- if .Values.operator.metrics.secure }}
+      scheme: https
+      tlsConfig:
+        # controller-runtime serves a self-signed cert for the secure metrics
+        # endpoint; skip verification (scrape is in-cluster).
+        insecureSkipVerify: true
+      {{- end }}
       {{- with .Values.monitoring.serviceMonitor.scrapeTimeout }}
       scrapeTimeout: {{ . }}
       {{- end }}
@@ -32,4 +40,61 @@ spec:
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
+{{- end }}
+{{- if .Values.controlPlane.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "minato.fullname" . }}-controlplane-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "minato.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controlplane
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      {{- with .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+{{- end }}
+{{- if .Values.registrar.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "minato.fullname" . }}-registrar-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "minato.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "minato.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: registrar
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      {{- with .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+{{- end }}
 {{- end }}

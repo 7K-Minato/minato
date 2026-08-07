@@ -44,7 +44,7 @@ jobs:
               - 'go.sum'
               - 'Makefile'
             helm:
-              - 'deploy/helm/**'
+              - 'chart/**'
             proto:
               - 'proto/**'
               - 'buf.yaml'

@@ -1,4 +1,7 @@
-{{- if and .Values.grafana.enabled .Values.grafana.prometheusRule.enabled }}
+{{- /* monitoring.prometheusRule wins; legacy grafana.* kept as fallback for one release. */ -}}
+{{- $legacyEnabled := and .Values.grafana.enabled .Values.grafana.prometheusRule.enabled -}}
+{{- if or .Values.monitoring.prometheusRule.enabled $legacyEnabled }}
+{{- $ruleLabels := .Values.monitoring.prometheusRule.labels | default .Values.grafana.prometheusRule.labels }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -6,7 +9,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "minato.labels" . | nindent 4 }}
-    {{- with .Values.grafana.prometheusRule.labels }}
+    {{- with $ruleLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
@@ -22,7 +25,7 @@ spec:
       annotations:
         summary: "Minato agent unreachable"
         description: "Agent for server {{ "{{" }} $labels.server {{ "}}" }} in namespace {{ "{{" }} $labels.namespace {{ "}}" }} has been unreachable for more than 5 minutes."
-    
+
     - alert: MinatoGameServerStuckProvisioning
       expr: |
         minato_gameservers{state="Provisioning"} == 1
@@ -32,7 +35,7 @@ spec:
       annotations:
         summary: "GameServer stuck in Provisioning"
         description: "GameServer {{ "{{" }} $labels.server {{ "}}" }} in namespace {{ "{{" }} $labels.namespace {{ "}}" }} has been stuck in Provisioning state for more than 10 minutes."
-    
+
     - alert: MinatoHighPlayerCount
       expr: |
         minato_players_online / minato_player_capacity > 0.9
@@ -42,7 +45,7 @@ spec:
       annotations:
         summary: "GameServer near capacity"
         description: "GameServer {{ "{{" }} $labels.server {{ "}}" }} is at {{ "{{" }} $value | humanizePercentage {{ "}}" }} capacity."
-    
+
     - alert: MinatoActionExecutionFailed
       expr: |
         rate(minato_action_executions_total{result="Failed"}[5m]) > 0
@@ -52,4 +55,74 @@ spec:
       annotations:
         summary: "Action execution failing"
         description: "Action {{ "{{" }} $labels.action {{ "}}" }} is failing (see ActionExecution objects for details)."
+
+    - alert: MinatoReconcileErrorRate
+      expr: |
+        rate(minato_reconcile_errors_total[5m]) > 0.1
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Controller reconcile errors"
+        description: "Controller {{ "{{" }} $labels.controller {{ "}}" }} is erroring at {{ "{{" }} $value | humanize {{ "}}" }} errors/s over the last 5 minutes."
+
+    - alert: MinatoFleetReplicasMismatch
+      expr: |
+        minato_fleet_replicas{kind="desired"} != minato_fleet_replicas{kind="ready"}
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Fleet replicas mismatch"
+        description: "Fleet {{ "{{" }} $labels.fleet {{ "}}" }} in namespace {{ "{{" }} $labels.namespace {{ "}}" }} has desired != ready replicas for more than 15 minutes."
+
+    - alert: MinatoWebhookErrorRate
+      expr: |
+        sum(rate(minato_webhook_requests_total{result="error"}[5m])) / sum(rate(minato_webhook_requests_total[5m])) > 0.05
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Admission webhook error rate"
+        description: "More than 5% of webhook requests are failing over the last 10 minutes (webhook {{ "{{" }} $labels.webhook {{ "}}" }})."
+
+    - alert: MinatoRegistrarHeartbeatFailures
+      expr: |
+        increase(minato_registrar_heartbeats_total{result="error"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Registrar heartbeats failing"
+        description: "The registrar failed to heartbeat to the minato cloud API in the last 5 minutes."
+
+    - alert: MinatoRegistrarMetricsPushFailures
+      expr: |
+        increase(minato_registrar_metrics_push_total{result="error"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Registrar metrics push failing"
+        description: "The registrar failed to push GameServer metrics to the minato cloud API in the last 5 minutes."
+
+    - alert: MinatoControlPlaneHigh5xxRate
+      expr: |
+        sum(rate(minato_controlplane_http_requests_total{status=~"5.."}[5m])) / sum(rate(minato_controlplane_http_requests_total[5m])) > 0.05
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Control plane 5xx rate"
+        description: "More than 5% of control plane requests returned 5xx over the last 10 minutes."
+
+    - alert: MinatoControlPlaneHighLatency
+      expr: |
+        histogram_quantile(0.95, sum(rate(minato_controlplane_http_request_duration_seconds_bucket[5m])) by (le)) > 1
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Control plane p95 latency high"
+        description: "Control plane p95 request latency is above 1s over the last 10 minutes."
 {{- end }}

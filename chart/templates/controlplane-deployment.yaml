@@ -40,6 +40,9 @@ spec:
             - name: http
               containerPort: {{ .Values.controlPlane.service.port }}
               protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.controlPlane.metrics.port }}
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /healthz
@@ -104,6 +107,10 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ .Values.controlPlane.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
   selector:
     {{- include "minato.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: controlplane
