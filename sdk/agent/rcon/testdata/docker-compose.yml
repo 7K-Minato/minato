@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   minecraft:
-    image: itzg/minecraft-server:latest
+    image: itzg/minecraft-server:latest@sha256:59feb0a1ef286f20a20560c56adf5b927155bfa842951f5db8b8bbc5a1a3ebde
     environment:
       EULA: "TRUE"
     ports:
@@ -10,13 +10,13 @@ services:
       - "25575:25575"
 
   cs2:
-    image: cm2network/cs2:latest
+    image: cm2network/cs2:latest@sha256:182f37326df93a8893d3c604a2c2c2a2164e40d126d4d5a71835b2610b913af7
     ports:
       - "27015:27015"
       - "27020:27020"
 
   palworld:
-    image: thijsvanloef/palworld-server-docker:latest
+    image: thijsvanloef/palworld-server-docker:latest@sha256:be3ad49e373045a7b60478fd8b7f7411c1e293713dfa4733e563e798f276d688
     environment:
       - "PUID=1000"
       - "PGID=1000"
