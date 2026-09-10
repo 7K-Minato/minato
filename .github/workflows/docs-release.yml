@@ -42,7 +42,7 @@ jobs:
 
   publish:
     needs: build
-    uses: 7K-Group/workflows-library/.github/workflows/release-docs.yml@v1
+    uses: 7K-Group/workflows-library/.github/workflows/release-docs.yml@8f3f1dd841f9f34fc74a5fdb76577119b251ec0c # v1
     with:
       path: site
       version: ${{ github.sha }}
