@@ -34,7 +34,7 @@ jobs:
         run: mkdocs build --strict
 
       - name: Upload site artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: docs-site
           path: site/
@@ -42,7 +42,7 @@ jobs:
 
   publish:
     needs: build
-    uses: 7K-Group/workflows-library/.github/workflows/release-docs.yml@v1
+    uses: 7K-Group/workflows-library/.github/workflows/release-docs.yml@8f3f1dd841f9f34fc74a5fdb76577119b251ec0c # v1
     with:
       path: site
       version: ${{ github.sha }}
